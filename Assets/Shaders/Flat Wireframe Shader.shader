@@ -22,13 +22,9 @@
 
 			CGPROGRAM
 
-			//#pragma target 4.0
-
 			#pragma vertex MyVertexProgram
 			#pragma fragment MyFragmentProgram
 			#pragma geometry MyGeometryProgram
-
-			//#define FORWARD_BASE_PASS
 
 			#include "MyFlatWireframe.cginc"
 
