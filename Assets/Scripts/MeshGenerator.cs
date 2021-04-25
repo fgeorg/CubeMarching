@@ -14,6 +14,8 @@ public class MeshGenerator : MonoBehaviour
     [SerializeField] protected bool _getNormalsFromSDF = false;
     [SerializeField] [Range(0, 5)] protected float _smoothMinFactor = 1;
 
+    [SerializeField] [Range(0, 1)] protected float _cubeMarchStepsToShow = 1;
+
     protected bool _shouldRegenerate = true;
 
     protected List<Vector3> _vertices = new List<Vector3>();
@@ -52,7 +54,7 @@ public class MeshGenerator : MonoBehaviour
         _triangles.Clear();
 
         float cubeSize = 1.0f / _resolution;
-
+        
         for (int x = 0; x < _resolution; x++)
         {
             for (int y = 0; y < _resolution; y++)
@@ -61,6 +63,11 @@ public class MeshGenerator : MonoBehaviour
                 {
                     var center = CenterPointAtIndices(x, y, z, cubeSize);
                     AddVoxel(_vertices, _triangles, x, y, z, cubeSize);
+                    float percentDone = (float) (x * _resolution * _resolution + y * _resolution + z)/(_resolution * _resolution * _resolution);
+                    
+                    if (percentDone > _cubeMarchStepsToShow) {
+                        break;
+                    }
                 }
             }
         }
