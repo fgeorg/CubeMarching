@@ -18,6 +18,7 @@
 
 			Blend SrcAlpha OneMinusSrcAlpha
 			ZWrite Off
+			Cull Off
 
 			CGPROGRAM
 
@@ -27,7 +28,7 @@
 			#pragma fragment MyFragmentProgram
 			#pragma geometry MyGeometryProgram
 
-			#define FORWARD_BASE_PASS
+			//#define FORWARD_BASE_PASS
 
 			#include "MyFlatWireframe.cginc"
 
