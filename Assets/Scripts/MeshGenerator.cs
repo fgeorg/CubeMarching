@@ -7,9 +7,17 @@ using UnityEngine;
 public class MeshGenerator : MonoBehaviour
 {
     [Range(1, 50)] [SerializeField] protected int _resolution = 1;
+    [Range(0, 10)] [SerializeField] protected int _projectionSteps = 1;
+    [Range(-3, 3)] [SerializeField] protected float _projectionAmount = 0;
+    [SerializeField] protected bool _dedupe = false;
+
+    [SerializeField] protected bool _getNormalsFromSDF = false;
+    [SerializeField] [Range(0, 5)] protected float _smoothMinFactor = 1;
+
     protected bool _shouldRegenerate = true;
 
     protected List<Vector3> _vertices = new List<Vector3>();
+    protected List<Vector3> _normals = new List<Vector3>();
     protected List<int> _triangles = new List<int>();
 
     protected Mesh _mesh;
@@ -31,7 +39,8 @@ public class MeshGenerator : MonoBehaviour
     protected void Regenerate()
     {
         _shouldRegenerate = false;
-        if (_mesh == null) {
+        if (_mesh == null)
+        {
             var existingMesh = GetComponent<MeshFilter>();
             DestroyImmediate(existingMesh);
             var mf = gameObject.AddComponent<MeshFilter>();
@@ -56,27 +65,97 @@ public class MeshGenerator : MonoBehaviour
             }
         }
 
+        ProjectVerticesToSurface();
+        if (_dedupe)
+        {
+            DedupeVerts();
+        }
+
 
         _mesh.SetVertices(_vertices);
-        ProjectVerticesToSurface();
         _mesh.SetTriangles(_triangles, 0);
-        _mesh.RecalculateNormals();
+        if (_getNormalsFromSDF)
+        {
+            _normals.Clear();
+            for (int i = 0; i < _vertices.Count; i++)
+            {
+                _normals.Add(GetNormal(_vertices[i]));
+            }
+            _mesh.SetNormals(_normals);
+        }
+        else
+        {
+            _mesh.RecalculateNormals();
+        }
     }
 
     private void ProjectVerticesToSurface()
     {
-        for (int i = 0; i < _vertices.Count; i++) {
-
+        for (int i = 0; i < _vertices.Count; i++)
+        {
+            for (int j = 0; j < _projectionSteps; j++)
+            {
+                var n = GetNormal(_vertices[i]);
+                _vertices[i] -= n * GetDistance(_vertices[i]) * _projectionAmount;
+            }
         }
     }
+
+    private void DedupeVerts()
+    {
+        var map = new Dictionary<Vector3, int>();
+        var indexMap = new int[_vertices.Count];
+        int index = 0;
+        var newVerts = new List<Vector3>();
+        for (int i = 0; i < _vertices.Count; i++)
+        {
+            if (map.ContainsKey(_vertices[i]))
+            {
+                indexMap[i] = map[_vertices[i]];
+                //Debug.Log($"deduping {i} -> {indexMap[i]}");
+            }
+            else
+            {
+                indexMap[i] = index;
+                map[_vertices[i]] = index;
+                newVerts.Add(_vertices[i]);
+                index++;
+            }
+        }
+        _vertices = newVerts;
+        for (int i = 0; i < _triangles.Count; i++)
+        {
+            _triangles[i] = indexMap[_triangles[i]];
+        }
+
+    }
+
 
     // signed distance to the mesh
     protected float GetDistance(Vector3 p)
     {
         // sphere
-        return (p - new Vector3(0.5f, 0.5f, 0.5f)).magnitude - 0.5f;
+        var sphere = (p - new Vector3(0.5f, 0.5f, 0.5f)).magnitude - 0.3f;
+        // torus
+        var torus = new Vector2(new Vector2(p.x - 0.5f, p.y - 0.8f).magnitude - .4f, p.z - 0.5f).magnitude - .1f;
+        return SMinCubic(sphere, torus, _smoothMinFactor);
     }
 
+    protected Vector3 GetNormal(Vector3 p)
+    {
+        Vector3 n = new Vector3(
+        GetDistance(p + new Vector3(1e-2f, 0, 0)),
+        GetDistance(p + new Vector3(0, 1e-2f, 0)),
+        GetDistance(p + new Vector3(0, 0, 1e-2f))
+        ) - GetDistance(p) * Vector3.one;
+        return n.normalized;
+    }
+
+    protected float SMinCubic(float a, float b, float k)
+    {
+        float h = Math.Max(k - Math.Abs(a - b), 0.0f) / k;
+        return Math.Min(a, b) - h * h * h * k * (1.0f / 6.0f);
+    }
 
     protected void AddVoxel(List<Vector3> vertices, List<int> triangles, Vector3 c, float cubeSize)
     {
