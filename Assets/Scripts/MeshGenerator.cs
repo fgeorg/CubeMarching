@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,6 +8,11 @@ public class MeshGenerator : MonoBehaviour
 {
     [Range(1, 50)] [SerializeField] protected int _resolution = 1;
     protected bool _shouldRegenerate = true;
+
+    protected List<Vector3> _vertices = new List<Vector3>();
+    protected List<int> _triangles = new List<int>();
+
+    protected Mesh _mesh;
 
     protected void OnValidate()
     {
@@ -20,16 +26,21 @@ public class MeshGenerator : MonoBehaviour
         {
             Regenerate();
         }
-        //Debug.DrawLine(new Vector3(0,0,0), new Vector3(1,0,0), Color.blue);
     }
 
     protected void Regenerate()
     {
         _shouldRegenerate = false;
-        var mesh = GetComponent<MeshFilter>().mesh;
-        mesh.Clear();
-        var vertices = new List<Vector3>();
-        var triangles = new List<int>();
+        if (_mesh == null) {
+            var existingMesh = GetComponent<MeshFilter>();
+            DestroyImmediate(existingMesh);
+            var mf = gameObject.AddComponent<MeshFilter>();
+            mf.sharedMesh = new Mesh();
+            _mesh = mf.sharedMesh;
+        }
+        _mesh.Clear();
+        _vertices.Clear();
+        _triangles.Clear();
 
         float cubeSize = 1.0f / _resolution;
 
@@ -40,19 +51,23 @@ public class MeshGenerator : MonoBehaviour
                 for (int z = 0; z < _resolution; z++)
                 {
                     var center = new Vector3((x + 0.5f) * cubeSize, (y + 0.5f) * cubeSize, (z + 0.5f) * cubeSize);
-                    //AddVoxel(vertices, triangles, center, cubeSize);
-                    if (GetDistance(center) < 0)
-                    {
-                        AddCube(vertices, triangles, new Vector3(x * cubeSize, y * cubeSize, z * cubeSize), new Vector3((x + 1) * cubeSize, (y + 1) * cubeSize, (z + 1) * cubeSize));
-                    }
+                    AddVoxel(_vertices, _triangles, center, cubeSize);
                 }
             }
         }
 
 
-        mesh.vertices = vertices.ToArray();
-        mesh.triangles = triangles.ToArray();
-        mesh.RecalculateNormals();
+        _mesh.SetVertices(_vertices);
+        ProjectVerticesToSurface();
+        _mesh.SetTriangles(_triangles, 0);
+        _mesh.RecalculateNormals();
+    }
+
+    private void ProjectVerticesToSurface()
+    {
+        for (int i = 0; i < _vertices.Count; i++) {
+
+        }
     }
 
     // signed distance to the mesh
@@ -63,9 +78,80 @@ public class MeshGenerator : MonoBehaviour
     }
 
 
-    protected void AddVoxel(List<Vector3> vertices, List<int> triangles, Vector3 c1, float cubeSize)
+    protected void AddVoxel(List<Vector3> vertices, List<int> triangles, Vector3 c, float cubeSize)
     {
+        if (GetDistance(c) > 0)
+        {
+            return;
+        }
 
+        int offset = vertices.Count;
+        float hs = cubeSize / 2.0f;
+        //below
+        if (GetDistance(c + new Vector3(0, -cubeSize, 0)) > 0)
+        {
+            vertices.Add(new Vector3(c.x - hs, c.y - hs, c.z - hs));
+            vertices.Add(new Vector3(c.x + hs, c.y - hs, c.z - hs));
+            vertices.Add(new Vector3(c.x + hs, c.y - hs, c.z + hs));
+            vertices.Add(new Vector3(c.x - hs, c.y - hs, c.z + hs));
+            AddQuadIndices(triangles, vertices.Count);
+        }
+        //above
+        if (GetDistance(c + new Vector3(0, cubeSize, 0)) > 0)
+        {
+            vertices.Add(new Vector3(c.x - hs, c.y + hs, c.z - hs));
+            vertices.Add(new Vector3(c.x - hs, c.y + hs, c.z + hs));
+            vertices.Add(new Vector3(c.x + hs, c.y + hs, c.z + hs));
+            vertices.Add(new Vector3(c.x + hs, c.y + hs, c.z - hs));
+            AddQuadIndices(triangles, vertices.Count);
+        }
+        //left
+        if (GetDistance(c + new Vector3(-cubeSize, 0, 0)) > 0)
+        {
+            vertices.Add(new Vector3(c.x - hs, c.y - hs, c.z - hs));
+            vertices.Add(new Vector3(c.x - hs, c.y - hs, c.z + hs));
+            vertices.Add(new Vector3(c.x - hs, c.y + hs, c.z + hs));
+            vertices.Add(new Vector3(c.x - hs, c.y + hs, c.z - hs));
+            AddQuadIndices(triangles, vertices.Count);
+        }
+        //right
+        if (GetDistance(c + new Vector3(cubeSize, 0, 0)) > 0)
+        {
+            vertices.Add(new Vector3(c.x + hs, c.y - hs, c.z - hs));
+            vertices.Add(new Vector3(c.x + hs, c.y + hs, c.z - hs));
+            vertices.Add(new Vector3(c.x + hs, c.y + hs, c.z + hs));
+            vertices.Add(new Vector3(c.x + hs, c.y - hs, c.z + hs));
+            AddQuadIndices(triangles, vertices.Count);
+        }
+        //front
+        if (GetDistance(c + new Vector3(0, 0, -cubeSize)) > 0)
+        {
+            vertices.Add(new Vector3(c.x - hs, c.y - hs, c.z - hs));
+            vertices.Add(new Vector3(c.x - hs, c.y + hs, c.z - hs));
+            vertices.Add(new Vector3(c.x + hs, c.y + hs, c.z - hs));
+            vertices.Add(new Vector3(c.x + hs, c.y - hs, c.z - hs));
+            AddQuadIndices(triangles, vertices.Count);
+        }
+        //back
+        if (GetDistance(c + new Vector3(0, 0, cubeSize)) > 0)
+        {
+            vertices.Add(new Vector3(c.x - hs, c.y - hs, c.z + hs));
+            vertices.Add(new Vector3(c.x + hs, c.y - hs, c.z + hs));
+            vertices.Add(new Vector3(c.x + hs, c.y + hs, c.z + hs));
+            vertices.Add(new Vector3(c.x - hs, c.y + hs, c.z + hs));
+            AddQuadIndices(triangles, vertices.Count);
+        }
+
+    }
+
+    protected void AddQuadIndices(List<int> triangles, int endIndex)
+    {
+        triangles.Add(endIndex - 4);
+        triangles.Add(endIndex - 3);
+        triangles.Add(endIndex - 2);
+        triangles.Add(endIndex - 4);
+        triangles.Add(endIndex - 2);
+        triangles.Add(endIndex - 1);
     }
 
     // smooth cube, sides share vertices and normals so it's shaded like a sphere, which looks weird 
