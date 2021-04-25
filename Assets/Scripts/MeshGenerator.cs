@@ -112,7 +112,6 @@ public class MeshGenerator : MonoBehaviour
             if (map.ContainsKey(_vertices[i]))
             {
                 indexMap[i] = map[_vertices[i]];
-                //Debug.Log($"deduping {i} -> {indexMap[i]}");
             }
             else
             {
