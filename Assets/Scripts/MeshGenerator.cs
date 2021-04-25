@@ -59,8 +59,8 @@ public class MeshGenerator : MonoBehaviour
             {
                 for (int z = 0; z < _resolution; z++)
                 {
-                    var center = CenterPointAtIndices(x,y,z, cubeSize);
-                    AddVoxel(_vertices, _triangles, x,y,z, cubeSize);
+                    var center = CenterPointAtIndices(x, y, z, cubeSize);
+                    AddVoxel(_vertices, _triangles, x, y, z, cubeSize);
                 }
             }
         }
@@ -70,7 +70,6 @@ public class MeshGenerator : MonoBehaviour
         {
             DedupeVerts();
         }
-
 
         _mesh.SetVertices(_vertices);
         _mesh.SetTriangles(_triangles, 0);
@@ -89,7 +88,8 @@ public class MeshGenerator : MonoBehaviour
         }
     }
 
-    protected Vector3 CenterPointAtIndices(int x, int y, int z, float cubeSize) {
+    protected Vector3 CenterPointAtIndices(int x, int y, int z, float cubeSize)
+    {
         return new Vector3((x + 0.5f) * cubeSize, (y + 0.5f) * cubeSize, (z + 0.5f) * cubeSize);
     }
 
@@ -157,7 +157,8 @@ public class MeshGenerator : MonoBehaviour
 
     protected float SMinCubic(float a, float b, float k)
     {
-        if (k <= 0) {
+        if (k <= 0)
+        {
             return Math.Min(a, b);
         }
         float h = Math.Max(k - Math.Abs(a - b), 0.0f) / k;
@@ -166,7 +167,7 @@ public class MeshGenerator : MonoBehaviour
 
     protected void AddVoxel(List<Vector3> vertices, List<int> triangles, int xi, int yi, int zi, float cubeSize)
     {
-        Vector3 c = CenterPointAtIndices(xi,yi,zi, cubeSize);
+        Vector3 c = CenterPointAtIndices(xi, yi, zi, cubeSize);
         if (GetDistance(c) > 0)
         {
             return;
@@ -175,7 +176,7 @@ public class MeshGenerator : MonoBehaviour
         int offset = vertices.Count;
         float hs = cubeSize / 2.0f;
         //below
-        if (GetDistance(CenterPointAtIndices(xi, yi-1, zi, cubeSize)) > 0)
+        if (GetDistance(CenterPointAtIndices(xi, yi - 1, zi, cubeSize)) > 0)
         {
             vertices.Add(new Vector3(c.x - hs, c.y - hs, c.z - hs));
             vertices.Add(new Vector3(c.x + hs, c.y - hs, c.z - hs));
@@ -184,7 +185,7 @@ public class MeshGenerator : MonoBehaviour
             AddQuadIndices(triangles, vertices.Count);
         }
         //above
-        if (GetDistance(CenterPointAtIndices(xi, yi+1, zi, cubeSize)) > 0)
+        if (GetDistance(CenterPointAtIndices(xi, yi + 1, zi, cubeSize)) > 0)
         {
             vertices.Add(new Vector3(c.x - hs, c.y + hs, c.z - hs));
             vertices.Add(new Vector3(c.x - hs, c.y + hs, c.z + hs));
@@ -193,7 +194,7 @@ public class MeshGenerator : MonoBehaviour
             AddQuadIndices(triangles, vertices.Count);
         }
         //left
-        if (GetDistance(CenterPointAtIndices(xi-1, yi, zi, cubeSize)) > 0)
+        if (GetDistance(CenterPointAtIndices(xi - 1, yi, zi, cubeSize)) > 0)
         {
             vertices.Add(new Vector3(c.x - hs, c.y - hs, c.z - hs));
             vertices.Add(new Vector3(c.x - hs, c.y - hs, c.z + hs));
@@ -202,7 +203,7 @@ public class MeshGenerator : MonoBehaviour
             AddQuadIndices(triangles, vertices.Count);
         }
         //right
-        if (GetDistance(CenterPointAtIndices(xi+1, yi, zi, cubeSize)) > 0)
+        if (GetDistance(CenterPointAtIndices(xi + 1, yi, zi, cubeSize)) > 0)
         {
             vertices.Add(new Vector3(c.x + hs, c.y - hs, c.z - hs));
             vertices.Add(new Vector3(c.x + hs, c.y + hs, c.z - hs));
@@ -211,7 +212,7 @@ public class MeshGenerator : MonoBehaviour
             AddQuadIndices(triangles, vertices.Count);
         }
         //front
-        if (GetDistance(CenterPointAtIndices(xi, yi, zi-1, cubeSize)) > 0)
+        if (GetDistance(CenterPointAtIndices(xi, yi, zi - 1, cubeSize)) > 0)
         {
             vertices.Add(new Vector3(c.x - hs, c.y - hs, c.z - hs));
             vertices.Add(new Vector3(c.x - hs, c.y + hs, c.z - hs));
