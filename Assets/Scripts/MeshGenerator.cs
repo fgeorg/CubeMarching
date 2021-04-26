@@ -14,8 +14,6 @@ public class MeshGenerator : MonoBehaviour {
 
     [SerializeField] protected bool _getNormalsFromSDF = false;
 
-    [SerializeField] [Range(0, 5)] protected float _smoothMinFactor = 1;
-
     [SerializeField] [Range(0, 1)] protected float _cubeMarchStepsToShow = 1;
 
     [SerializeField] protected CombinedDistanceField _distanceField = null;
@@ -71,11 +69,10 @@ public class MeshGenerator : MonoBehaviour {
                 }
             }
         }
-
-        ProjectVerticesToSurface();
         if (_dedupe) {
             DedupeVerts();
         }
+        ProjectVerticesToSurface();
 
         _mesh.SetVertices(_vertices);
         _mesh.SetTriangles(_triangles, 0);
@@ -130,15 +127,8 @@ public class MeshGenerator : MonoBehaviour {
 
     }
 
-
-    // signed distance to the mesh
     protected float GetDistance(Vector3 p) {
         return _distanceField.GetDistance(transform.TransformPoint(p));
-        // // sphere
-        // var sphere = (p - new Vector3(0.5f, 0.5f, 0.5f)).magnitude - 0.3f;
-        // // torus
-        // var torus = new Vector2(new Vector2(p.x - 0.5f, p.y - 0.8f).magnitude - .4f, p.z - 0.5f).magnitude - .1f;
-        // return SMinCubic(sphere, torus, _smoothMinFactor);
     }
 
     protected Vector3 GetNormal(Vector3 p) {

@@ -9,7 +9,9 @@
 		_WireframeColor ("Wireframe Color", Color) = (0, 0, 0)
 		_WireframeSmoothing ("Wireframe Smoothing", Range(0, 10)) = 1
 		_WireframeThickness ("Wireframe Thickness", Range(0, 10)) = 1
-        [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 0
+		[Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2 //"Back"
+		[Enum(Off,0,On,1)] _ZWrite ("ZWrite", Float) = 0.0 //"Off"
+		[Enum(UnityEngine.Rendering.CompareFunction)] _ZTest ("ZTest", Float) = 5 //"LessEqual"
 	}
 
 
@@ -18,8 +20,9 @@
 		Pass {
 
 			Blend SrcAlpha OneMinusSrcAlpha
-			ZWrite Off
+			ZWrite [_ZWrite]
 			Cull [_Cull]
+			ZTest [_ZTest]
 
 			CGPROGRAM
 
