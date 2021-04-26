@@ -9,6 +9,7 @@
 		_WireframeColor ("Wireframe Color", Color) = (0, 0, 0)
 		_WireframeSmoothing ("Wireframe Smoothing", Range(0, 10)) = 1
 		_WireframeThickness ("Wireframe Thickness", Range(0, 10)) = 1
+        [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 0
 	}
 
 
@@ -18,7 +19,7 @@
 
 			Blend SrcAlpha OneMinusSrcAlpha
 			ZWrite Off
-			Cull Off
+			Cull [_Cull]
 
 			CGPROGRAM
 
