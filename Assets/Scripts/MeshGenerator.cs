@@ -1,12 +1,16 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 [ExecuteInEditMode]
 public class MeshGenerator : MonoBehaviour {
-    [SerializeField] protected Bounds _bounds = new Bounds(Vector3.zero, Vector3.one);
+    public enum EAlgorithm {
+        CubeMarch,
+        Voxels
+    }
 
+    [SerializeField] protected Bounds _bounds = new Bounds(Vector3.zero, Vector3.one);
+    [SerializeField] protected EAlgorithm _algorithm = EAlgorithm.CubeMarch;
     [Range(1, 50)] [SerializeField] protected int _resolution = 1;
     [Range(0, 10)] [SerializeField] protected int _projectionSteps = 1;
     [Range(-3, 3)] [SerializeField] protected float _projectionAmount = 0;
@@ -59,8 +63,16 @@ public class MeshGenerator : MonoBehaviour {
         for (int x = 0; x < _resolution; x++) {
             for (int y = 0; y < _resolution; y++) {
                 for (int z = 0; z < _resolution; z++) {
-                    var center = CenterPointAtIndices(x, y, z, cubeSize);
-                    AddVoxel(_vertices, _triangles, x, y, z, cubeSize);
+                    switch (_algorithm) {
+                        case EAlgorithm.CubeMarch:
+                            AddCube(_vertices, _triangles, x, y, z, cubeSize);
+                            break;
+                        case EAlgorithm.Voxels:
+                            AddVoxel(_vertices, _triangles, x, y, z, cubeSize);
+                            break;
+                        default:
+                            break;
+                    }
                     float percentDone = (float)(x * _resolution * _resolution + y * _resolution + z) / (_resolution * _resolution * _resolution);
 
                     if (percentDone > _cubeMarchStepsToShow) {
@@ -94,6 +106,15 @@ public class MeshGenerator : MonoBehaviour {
             (z + 0.5f) * cubeSize * (_bounds.max.z - _bounds.min.z) + _bounds.min.z
         );
     }
+
+    protected Vector3 PointAtIndices(int x, int y, int z, float cubeSize) {
+        return new Vector3(
+            x * cubeSize * (_bounds.max.x - _bounds.min.x) + _bounds.min.x,
+            y * cubeSize * (_bounds.max.y - _bounds.min.y) + _bounds.min.y,
+            z * cubeSize * (_bounds.max.z - _bounds.min.z) + _bounds.min.z
+        );
+    }
+
 
 
     protected void ProjectVerticesToSurface() {
@@ -147,8 +168,32 @@ public class MeshGenerator : MonoBehaviour {
         float h = Math.Max(k - Math.Abs(a - b), 0.0f) / k;
         return Math.Min(a, b) - h * h * h * k * (1.0f / 6.0f);
     }
+    protected void AddCube(List<Vector3> vertices, List<int> triangles, int xi, int yi, int zi, float cubeSize) {
+
+        int bits =
+                GetDistance(PointAtIndices(xi + 0, yi + 0, zi + 1, cubeSize)) < 0 ? (1 << 0) : 0;
+        bits |= GetDistance(PointAtIndices(xi + 1, yi + 0, zi + 1, cubeSize)) < 0 ? (1 << 1) : 0;
+        bits |= GetDistance(PointAtIndices(xi + 1, yi + 0, zi + 0, cubeSize)) < 0 ? (1 << 2) : 0;
+        bits |= GetDistance(PointAtIndices(xi + 0, yi + 0, zi + 0, cubeSize)) < 0 ? (1 << 3) : 0;
+        bits |= GetDistance(PointAtIndices(xi + 0, yi + 1, zi + 1, cubeSize)) < 0 ? (1 << 4) : 0;
+        bits |= GetDistance(PointAtIndices(xi + 1, yi + 1, zi + 1, cubeSize)) < 0 ? (1 << 5) : 0;
+        bits |= GetDistance(PointAtIndices(xi + 1, yi + 1, zi + 0, cubeSize)) < 0 ? (1 << 6) : 0;
+        bits |= GetDistance(PointAtIndices(xi + 0, yi + 1, zi + 0, cubeSize)) < 0 ? (1 << 7) : 0;
+        var origin = PointAtIndices(xi, yi, zi, cubeSize);
+        var cubeDim = (_bounds.max - _bounds.min) * cubeSize;
+
+        var tris = MarchTables.triangulation[~bits & 255]; // flip inside and outside because the table uses the opposite winding order from Unity
+        foreach (var tri in tris) {
+            _triangles.Add(_vertices.Count);
+            var edgePoint = MarchTables.edgePoints[tri];
+            _vertices.Add(new Vector3(origin.x + edgePoint.x * cubeDim.x,
+                                      origin.y + edgePoint.y * cubeDim.y,
+                                      origin.z + edgePoint.z * cubeDim.z));
+        }
+    }
 
     protected void AddVoxel(List<Vector3> vertices, List<int> triangles, int xi, int yi, int zi, float cubeSize) {
+
         Vector3 c = CenterPointAtIndices(xi, yi, zi, cubeSize);
         if (GetDistance(c) > 0) {
             return;
