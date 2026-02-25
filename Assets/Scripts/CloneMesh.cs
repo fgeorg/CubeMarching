@@ -5,7 +5,7 @@ using UnityEngine;
 [ExecuteInEditMode]
 public class CloneMesh : MonoBehaviour
 {
-    [SerializeField] protected MeshGenerator _meshGenerator = null;
+    [SerializeField] protected GameObject _otherMesh = null;
     protected MeshFilter _meshFilter;
     protected bool _shouldRegenerate = true;
 
@@ -25,11 +25,11 @@ public class CloneMesh : MonoBehaviour
 
     protected void Regenerate()
     {
-        if (_meshGenerator == null)
+        if (_otherMesh == null)
         {
             return;
         }
-        var meshToFollow = _meshGenerator.GetComponent<MeshFilter>();
+        var meshToFollow = _otherMesh.GetComponent<MeshFilter>();
         if (meshToFollow == null)
         {
             return;
@@ -37,7 +37,7 @@ public class CloneMesh : MonoBehaviour
 
         _shouldRegenerate = false;
 
-        if (_meshFilter == null && _meshGenerator != null)
+        if (_meshFilter == null && _otherMesh != null)
         {
             var existingMesh = GetComponent<MeshFilter>();
             DestroyImmediate(existingMesh);

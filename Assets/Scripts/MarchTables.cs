@@ -277,4 +277,21 @@ public static class MarchTables {
         new Vector3(1.0f, 0.5f, 0.0f),
         new Vector3(0.0f, 0.5f, 0.0f),
     };
+
+    // For each of the 12 edges: { cornerA_dx, cornerA_dy, cornerA_dz, cornerB_dx, cornerB_dy, cornerB_dz }
+    // Midpoint of each entry matches the corresponding edgePoints[i] entry.
+    public static readonly int[,] edgeCornerOffsets = {
+        { 0,0,1,  1,0,1 },  // edge  0 → midpoint (0.5, 0.0, 1.0)
+        { 1,0,1,  1,0,0 },  // edge  1 → midpoint (1.0, 0.0, 0.5)
+        { 1,0,0,  0,0,0 },  // edge  2 → midpoint (0.5, 0.0, 0.0)
+        { 0,0,0,  0,0,1 },  // edge  3 → midpoint (0.0, 0.0, 0.5)
+        { 0,1,1,  1,1,1 },  // edge  4 → midpoint (0.5, 1.0, 1.0)
+        { 1,1,1,  1,1,0 },  // edge  5 → midpoint (1.0, 1.0, 0.5)
+        { 1,1,0,  0,1,0 },  // edge  6 → midpoint (0.5, 1.0, 0.0)
+        { 0,1,0,  0,1,1 },  // edge  7 → midpoint (0.0, 1.0, 0.5)
+        { 0,0,1,  0,1,1 },  // edge  8 → midpoint (0.0, 0.5, 1.0)
+        { 1,0,1,  1,1,1 },  // edge  9 → midpoint (1.0, 0.5, 1.0)
+        { 1,0,0,  1,1,0 },  // edge 10 → midpoint (1.0, 0.5, 0.0)
+        { 0,0,0,  0,1,0 },  // edge 11 → midpoint (0.0, 0.5, 0.0)
+    };
 }
