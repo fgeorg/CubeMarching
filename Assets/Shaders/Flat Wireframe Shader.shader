@@ -31,6 +31,13 @@ Shader "Custom/Flat Wireframe" {
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
+            #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
+            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
+            #pragma multi_compile _ LIGHTMAP_ON
             #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -61,6 +68,7 @@ Shader "Custom/Flat Wireframe" {
 
             struct Varyings {
                 float4 positionHCS : SV_POSITION;
+                float3 positionWS  : TEXCOORD1;
                 float3 normalWS    : TEXCOORD2;
                 float2 uv          : TEXCOORD0;
                 float2 barycentric : TEXCOORD3;
@@ -72,8 +80,10 @@ Shader "Custom/Flat Wireframe" {
                 UNITY_SETUP_INSTANCE_ID(IN);
                 UNITY_TRANSFER_INSTANCE_ID(IN, OUT);
 
-                VertexNormalInputs normInputs = GetVertexNormalInputs(IN.normalOS);
-                OUT.positionHCS = TransformObjectToHClip(IN.positionOS.xyz);
+                VertexPositionInputs posInputs  = GetVertexPositionInputs(IN.positionOS.xyz);
+                VertexNormalInputs  normInputs = GetVertexNormalInputs(IN.normalOS);
+                OUT.positionHCS = posInputs.positionCS;
+                OUT.positionWS  = posInputs.positionWS;
                 OUT.normalWS    = normInputs.normalWS;
                 OUT.uv          = TRANSFORM_TEX(IN.uv, _MainTex);
                 OUT.barycentric = IN.barycentric;
@@ -87,13 +97,29 @@ Shader "Custom/Flat Wireframe" {
                 float4 albedo = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv) * tint;
                 clip(albedo.a - _Cutoff);
 
-                // Lambert diffuse + SH ambient
-                float3 normalWS  = vface * normalize(IN.normalWS);
-                Light  mainLight = GetMainLight();  // zero-arg overload: no shadow coord
-                float  NdotL     = saturate(dot(normalWS, mainLight.direction));
-                float3 diffuse   = mainLight.color * NdotL;
-                float3 ambient   = max(SampleSH(normalWS), float3(0.1, 0.1, 0.1));
-                float3 litColor  = (diffuse + ambient) * albedo.rgb;
+                float3 normalWS = normalize(vface > 0 ? IN.normalWS : -IN.normalWS);
+
+                InputData inputData = (InputData)0;
+                inputData.positionWS          = IN.positionWS;
+                inputData.normalWS            = normalWS;
+                inputData.viewDirectionWS     = SafeNormalize(GetCameraPositionWS() - IN.positionWS);
+                inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(IN.positionHCS);
+                inputData.bakedGI             = SampleSH(normalWS);
+                inputData.shadowMask          = unity_ProbesOcclusion;
+                #if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE) || defined(_MAIN_LIGHT_SHADOWS_SCREEN)
+                    inputData.shadowCoord = TransformWorldToShadowCoord(IN.positionWS);
+                #else
+                    inputData.shadowCoord = float4(0, 0, 0, 0);
+                #endif
+
+                SurfaceData surfaceData = (SurfaceData)0;
+                surfaceData.albedo     = albedo.rgb;
+                surfaceData.alpha      = albedo.a;
+                surfaceData.occlusion  = 1;
+                surfaceData.smoothness = 0.5;
+                surfaceData.normalTS   = half3(0, 0, 1);
+
+                float3 litColor = UniversalFragmentPBR(inputData, surfaceData).rgb;
 
                 // Wireframe overlay.
                 // fwidth clamped at 0.05 — without this, small screen-space triangles flood

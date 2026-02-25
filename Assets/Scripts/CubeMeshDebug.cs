@@ -11,6 +11,7 @@ public class CubeMeshDebug : MonoBehaviour {
     protected List<Vector3> _vertices = new List<Vector3>();
     protected List<Vector3> _normals = new List<Vector3>();
     protected List<int> _triangles = new List<int>();
+    protected List<Vector2> _barycentrics = new List<Vector2>();
 
     protected Mesh _mesh;
 
@@ -55,8 +56,16 @@ public class CubeMeshDebug : MonoBehaviour {
             _vertices.Add(MarchTables.edgePoints[tri] - 0.5f * Vector3.one);
         }
 
+        _barycentrics.Clear();
+        for (int i = 0; i < _vertices.Count; i++) {
+            int pos = i % 3;
+            _barycentrics.Add(pos == 0 ? new Vector2(1, 0) :
+                              pos == 1 ? new Vector2(0, 1) : Vector2.zero);
+        }
+
         _mesh.SetVertices(_vertices);
         _mesh.SetTriangles(_triangles, 0);
+        _mesh.SetUVs(1, _barycentrics);
         _mesh.RecalculateNormals();
     }
 }
