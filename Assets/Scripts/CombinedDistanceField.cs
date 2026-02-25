@@ -2,33 +2,16 @@ using UnityEngine;
 
 [ExecuteInEditMode]
 public class CombinedDistanceField : MonoBehaviour, IDistanceField {
-    private struct TransformTracker {
-        private readonly Transform _transform;
-        private Matrix4x4 _lastMatrix;
-
-        public TransformTracker(Transform t) {
-            _transform = t;
-            _lastMatrix = t.localToWorldMatrix;
-        }
-
-        public bool HasChanged() {
-            var m = _transform.localToWorldMatrix;
-            if (m == _lastMatrix) return false;
-            _lastMatrix = m;
-            return true;
-        }
-    }
-
     [SerializeField] [Range(0, 5)] protected float _smoothMinFactor = 1;
     [SerializeField] protected MeshGenerator _generator;
     [SerializeField] protected CubeDistanceField _cube;
     [SerializeField] protected SphereDistanceField _sphere;
     [SerializeField] protected TorusDistanceField _torus;
 
-    private TransformTracker[] _trackers;
+    private TransformTracker[] _transformTrackers;
 
     private void OnEnable() {
-        _trackers = new TransformTracker[] {
+        _transformTrackers = new TransformTracker[] {
             new(_cube.transform),
             new(_sphere.transform),
             new(_torus.transform),
@@ -41,8 +24,8 @@ public class CombinedDistanceField : MonoBehaviour, IDistanceField {
 
     private void Update() {
         bool dirty = false;
-        for (int i = 0; i < _trackers.Length; i++)
-            dirty |= _trackers[i].HasChanged();
+        for (int i = 0; i < _transformTrackers.Length; i++)
+            dirty |= _transformTrackers[i].HasChanged();
         if (dirty) _generator.MarkDirty();
     }
 
