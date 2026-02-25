@@ -5,7 +5,7 @@ using UnityEngine;
 [ExecuteInEditMode]
 public class CubeMeshDebug : MonoBehaviour {
 
-    [SerializeField] protected int _includedCornersBits = 0;
+    [SerializeField, Range(0, 255)] protected byte _includedCornersBits = 0;
     [SerializeField] GameObject[] _cornerSpheres = null;
 
     protected List<Vector3> _vertices = new List<Vector3>();
@@ -16,6 +16,35 @@ public class CubeMeshDebug : MonoBehaviour {
     protected Mesh _mesh;
 
     protected bool _shouldRegenerate = true;
+
+    public void OnEnable() {
+        if (_cornerSpheres == null) return;
+        for (int i = 0; i < _cornerSpheres.Length; i++) {
+            if (_cornerSpheres[i] == null) continue;
+            var listener = _cornerSpheres[i].GetComponent<DebugCornerListener>()
+                        ?? _cornerSpheres[i].AddComponent<DebugCornerListener>();
+            int index = i;
+            listener.onActiveChanged = active => OnCornerActiveChanged(index, active);
+        }
+    }
+
+    protected void OnDisable() {
+        if (_cornerSpheres == null) return;
+        foreach (var sphere in _cornerSpheres) {
+            var listener = sphere != null ? sphere.GetComponent<DebugCornerListener>() : null;
+            if (listener != null) listener.onActiveChanged = null;
+        }
+    }
+
+    private void OnCornerActiveChanged(int index, bool active) {
+        if (active) {
+            _includedCornersBits |= (byte)(1 << index);
+        }
+        else {
+            _includedCornersBits &= (byte)~(1 << index);
+        }
+        _shouldRegenerate = true;
+    }
 
     public void MarkDirty() {
         _shouldRegenerate = true;
@@ -67,5 +96,7 @@ public class CubeMeshDebug : MonoBehaviour {
         _mesh.SetTriangles(_triangles, 0);
         _mesh.SetUVs(1, _barycentrics);
         _mesh.RecalculateNormals();
+
+        _shouldRegenerate = false;
     }
 }
