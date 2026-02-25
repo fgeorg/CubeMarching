@@ -166,13 +166,17 @@ public class MeshGenerator : MonoBehaviour
         if (_algorithm == EAlgorithm.CubeMarch)
         {
             _edgeVertexCache.Clear();
-            for (int x = 0; x < _resolution; x++)
+            bool earlyExit = false;
+            for (int x = 0; x < _resolution && !earlyExit; x++)
             {
-                for (int y = 0; y < _resolution; y++)
+                for (int y = 0; y < _resolution && !earlyExit; y++)
                 {
                     for (int z = 0; z < _resolution; z++)
                     {
                         AddCubeWithEdgeDedup(x, y, z, cubeSize);
+                        float percentDone = (float)(x * _resolution * _resolution + y * _resolution + z)
+                                          / (_resolution * _resolution * _resolution);
+                        if (percentDone > _cubeMarchStepsToShow) { earlyExit = true; break; }
                     }
                 }
             }
@@ -180,13 +184,17 @@ public class MeshGenerator : MonoBehaviour
         else
         {
             _cornerVertexCache.Clear();
-            for (int x = 0; x < _resolution; x++)
+            bool earlyExit = false;
+            for (int x = 0; x < _resolution && !earlyExit; x++)
             {
-                for (int y = 0; y < _resolution; y++)
+                for (int y = 0; y < _resolution && !earlyExit; y++)
                 {
                     for (int z = 0; z < _resolution; z++)
                     {
                         AddVoxelWithCornerDedup(x, y, z, cubeSize);
+                        float percentDone = (float)(x * _resolution * _resolution + y * _resolution + z)
+                                          / (_resolution * _resolution * _resolution);
+                        if (percentDone > _cubeMarchStepsToShow) { earlyExit = true; break; }
                     }
                 }
             }

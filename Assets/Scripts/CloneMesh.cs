@@ -14,7 +14,6 @@ public class CloneMesh : MonoBehaviour
         _shouldRegenerate = true;
     }
 
-    // Update is called once per frame
     protected void Update()
     {
         if (_shouldRegenerate)

@@ -1,7 +1,5 @@
 {
     "files.exclude": {
-        "**/*.csproj": true,
-        "**/*.sln": true,
         "**/*.slnx": true,
         "**/.DS_Store": true,
         "**/.git": true,
