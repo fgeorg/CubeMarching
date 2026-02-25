@@ -193,7 +193,6 @@ public class MeshGenerator : MonoBehaviour {
     }
 
     protected void AddVoxel(List<Vector3> vertices, List<int> triangles, int xi, int yi, int zi, float cubeSize) {
-
         Vector3 c = CenterPointAtIndices(xi, yi, zi, cubeSize);
         if (GetDistance(c) > 0) {
             return;
