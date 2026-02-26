@@ -89,15 +89,23 @@ public static class SceneViewPerformanceOverlay
         EditorGUI.DrawRect(new Rect(marginX, marginY, boxWidth, boxHeight), new Color(0, 0, 0, 0.7f));
 
         GUIStyle style = new GUIStyle(EditorStyles.boldLabel);
-        style.normal.textColor = new Color(.6f, 1.0f, 0.6f);
+        style.hover.background = null;
+
+        void SetStyleColor(Color c)
+        {
+            style.normal.textColor = c;
+            style.hover.textColor = c;
+        }
+
+        SetStyleColor(new Color(.6f, 1.0f, 0.6f));
         GUI.Label(new Rect(marginX + padding, marginY + padding, 155, 20), $"FPS: {displayFps:F0}", style);
 
-        style.normal.textColor = Color.white;
+        SetStyleColor(Color.white);
         GUI.Label(new Rect(marginX + padding, marginY + padding + lineHeight, 155, 20), $"CPU: {displayCpuMs:F2} ms", style);
         GUI.Label(new Rect(marginX + padding, marginY + padding + 2 * lineHeight, 155, 20), $"GPU: {displayGpuMs:F2} ms", style);
 
         float y = marginY + padding + 3 * lineHeight;
-        style.normal.textColor = new Color(1f, 0.9f, 0.5f);
+        SetStyleColor(new Color(1f, 0.9f, 0.5f));
         foreach (var entry in DebugStore.Entries)
         {
             GUI.Label(new Rect(marginX + padding, y, boxWidth - 2 * padding, 20), $"{entry.Key}: {entry.Value}", style);
