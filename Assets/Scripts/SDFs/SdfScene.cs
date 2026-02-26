@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
@@ -5,25 +6,27 @@ using UnityEngine;
 [ExecuteInEditMode]
 public class SdfScene : MonoBehaviour
 {
-    // 80 bytes: Vector4 (16) + Matrix4x4 (64)
     [StructLayout(LayoutKind.Sequential)]
     private struct GpuSdfNode
     {
-        public Vector4   typeAndParams; // x=type, y=param0, z=param1, w=param2
-        public Matrix4x4 transform;     // worldToLocalMatrix for primitives; identity for ops
+        public Vector4 typeAndParams; // x=type, y=param0, z=param1, w=param2
+        public Matrix4x4 transform; // worldToLocalMatrix for primitives; identity for ops
     }
 
     [Tooltip("the static \"window\" into our sdf with the RayMarchScene material on it")]
     [SerializeField] private GameObject _SdfWindow;
-    private Renderer             _renderer;
+    private Renderer _renderer;
     private MaterialPropertyBlock _propertyBlock;
-    private GraphicsBuffer        _buffer;
+    private GraphicsBuffer _buffer;
     private readonly List<GpuSdfNode> _nodes = new List<GpuSdfNode>();
+    private bool _hierarchyDirty;
+    private TransformTracker[] _trackers = Array.Empty<TransformTracker>();
 
     private void OnEnable()
     {
-        _renderer      = _SdfWindow.GetComponent<Renderer>();
+        _renderer = _SdfWindow.GetComponent<Renderer>();
         _propertyBlock = new MaterialPropertyBlock();
+        _hierarchyDirty = true;
         RebuildBuffer();
     }
 
@@ -31,24 +34,40 @@ public class SdfScene : MonoBehaviour
     {
         _buffer?.Release();
         _buffer = null;
+        _trackers = Array.Empty<TransformTracker>();
     }
 
     private void OnTransformChildrenChanged()
     {
-        RebuildBuffer();
+        _hierarchyDirty = true;
+    }
+
+    public void MarkDirty()
+    {
+        _hierarchyDirty = true;
     }
 
     private void Update()
     {
-        // TODO: replace with TransformTracker dirty detection — for now rebuild every frame
-        RebuildBuffer();
+        bool dirty = _hierarchyDirty;
+        if (!dirty)
+        {
+            for (int i = 0; i < _trackers.Length; i++)
+                if (_trackers[i].HasChanged()) { dirty = true; break; }
+        }
+        if (dirty) {
+            RebuildBuffer();
+        }
     }
 
     private void RebuildBuffer()
     {
         if (_renderer == null) return;
+     
+        _hierarchyDirty = false;
 
         _nodes.Clear();
+        var primitiveTransforms = new List<Transform>();
         bool first = true;
 
         foreach (Transform child in transform)
@@ -56,7 +75,7 @@ public class SdfScene : MonoBehaviour
             if (!child.gameObject.activeInHierarchy) continue;
             SdfNodeComponent node = child.GetComponent<SdfNodeComponent>();
             if (node == null) continue;
-            TraversePostOrder(node, _nodes);
+            TraversePostOrder(node, _nodes, primitiveTransforms);
             // interleave: emit a union after each child past the first → depth stays at 2
             if (!first) _nodes.Add(MakeOp(SdfNodeComponent.SdfNodeType.Union, 0f));
             first = false;
@@ -79,13 +98,19 @@ public class SdfScene : MonoBehaviour
         _propertyBlock.SetBuffer("_SdfNodes", _buffer);
         _propertyBlock.SetInteger("_SdfNodeCount", count);
         _renderer.SetPropertyBlock(_propertyBlock);
+
+        // Rebuild transform trackers from all primitive nodes found during traversal
+        _trackers = new TransformTracker[primitiveTransforms.Count];
+        for (int i = 0; i < primitiveTransforms.Count; i++)
+            _trackers[i] = new TransformTracker(primitiveTransforms[i]);
     }
 
-    private void TraversePostOrder(SdfNodeComponent node, List<GpuSdfNode> list)
+    private void TraversePostOrder(SdfNodeComponent node, List<GpuSdfNode> list, List<Transform> primitiveTransforms)
     {
         if ((int)node.nodeType < 10)
         {
             list.Add(MakePrimitive(node));
+            primitiveTransforms.Add(node.transform);
         }
         else if ((int)node.nodeType >= 20) // unary modifier
         {
@@ -96,7 +121,7 @@ public class SdfScene : MonoBehaviour
                 if (!child.gameObject.activeInHierarchy) continue;
                 SdfNodeComponent childNode = child.GetComponent<SdfNodeComponent>();
                 if (childNode == null) continue;
-                TraversePostOrder(childNode, list);
+                TraversePostOrder(childNode, list, primitiveTransforms);
                 if (!first) list.Add(MakeOp(SdfNodeComponent.SdfNodeType.Union, 0f));
                 first = false;
             }
@@ -112,7 +137,7 @@ public class SdfScene : MonoBehaviour
                 if (!child.gameObject.activeInHierarchy) continue;
                 SdfNodeComponent childNode = child.GetComponent<SdfNodeComponent>();
                 if (childNode == null) continue;
-                TraversePostOrder(childNode, list);
+                TraversePostOrder(childNode, list, primitiveTransforms);
                 if (!first) list.Add(MakeOp(node.nodeType, node.smoothK));
                 first = false;
             }
@@ -145,15 +170,15 @@ public class SdfScene : MonoBehaviour
         return new GpuSdfNode
         {
             typeAndParams = new Vector4((int)node.nodeType, param, 0, 0),
-            transform     = Matrix4x4.identity
+            transform = Matrix4x4.identity
         };
     }
 
     // GPU-only smooth-variant type IDs (not in the C# enum).
     // Must match #define SDF_SMOOTH_* in Assets/Shaders/SdfNodeTypes.hlsl.
-    private const int GpuSmoothUnion     = 11;
+    private const int GpuSmoothUnion = 11;
     private const int GpuSmoothIntersect = 14;
-    private const int GpuSmoothSubtract  = 15;
+    private const int GpuSmoothSubtract = 15;
 
     private static GpuSdfNode MakeOp(SdfNodeComponent.SdfNodeType type, float smoothK)
     {
@@ -162,15 +187,15 @@ public class SdfScene : MonoBehaviour
         int gpuType;
         switch (type)
         {
-            case SdfNodeComponent.SdfNodeType.Union:     gpuType = smooth ? GpuSmoothUnion     : (int)type; break;
+            case SdfNodeComponent.SdfNodeType.Union: gpuType = smooth ? GpuSmoothUnion : (int)type; break;
             case SdfNodeComponent.SdfNodeType.Intersect: gpuType = smooth ? GpuSmoothIntersect : (int)type; break;
-            case SdfNodeComponent.SdfNodeType.Subtract:  gpuType = smooth ? GpuSmoothSubtract  : (int)type; break;
-            default:                                      gpuType = (int)type;                               break;
+            case SdfNodeComponent.SdfNodeType.Subtract: gpuType = smooth ? GpuSmoothSubtract : (int)type; break;
+            default: gpuType = (int)type; break;
         }
         return new GpuSdfNode
         {
             typeAndParams = new Vector4(gpuType, smoothK, 0, 0),
-            transform     = Matrix4x4.identity
+            transform = Matrix4x4.identity
         };
     }
 }

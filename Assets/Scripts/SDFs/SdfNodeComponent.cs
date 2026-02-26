@@ -22,6 +22,11 @@ public class SdfNodeComponent : MonoBehaviour
     }
 
     public SdfNodeType nodeType = SdfNodeType.Sphere;
+
+    private void OnValidate()
+    {
+        GetComponentInParent<SdfScene>()?.MarkDirty();
+    }
     public float sphereRadius = 0.5f;
     public Vector3 boxHalfExtents = new Vector3(0.5f, 0.5f, 0.5f);
     public float torusMajorRadius = 0.4f;
