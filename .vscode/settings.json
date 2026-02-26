@@ -22,7 +22,6 @@
         "Temp/": true,
         "Logs/": true,
         "UserSettings/": true,
-        ".idea/": true
     },
-    "dotnet.defaultSolution": "CubeMarching.slnx"
+    "dotnet.defaultSolution": "sdf-explorations-unity.slnx"
 }

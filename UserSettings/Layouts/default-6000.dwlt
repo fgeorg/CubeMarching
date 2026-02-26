@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEditor.dll::UnityEditor.ContainerWindow
   m_PixelRect:
     serializedVersion: 2
-    x: 1102
-    y: 479
+    x: 993
+    y: 408
     width: 1186
     height: 863
   m_ShowMode: 0
@@ -97,7 +97,7 @@ MonoBehaviour:
   m_MinSize: {x: 310, y: 226}
   m_MaxSize: {x: 4000, y: 4026}
   vertical: 0
-  controlID: 92
+  controlID: 565
   draggingID: 0
 --- !u!114 &5
 MonoBehaviour:
@@ -123,7 +123,7 @@ MonoBehaviour:
   m_MinSize: {x: 300, y: 112}
   m_MaxSize: {x: 24288, y: 16192}
   vertical: 0
-  controlID: 56
+  controlID: 28
   draggingID: 0
 --- !u!114 &6
 MonoBehaviour:
@@ -299,7 +299,7 @@ MonoBehaviour:
   m_MinSize: {x: 200, y: 112}
   m_MaxSize: {x: 16192, y: 16192}
   vertical: 1
-  controlID: 57
+  controlID: 29
   draggingID: 0
 --- !u!114 &13
 MonoBehaviour:
@@ -325,7 +325,7 @@ MonoBehaviour:
   m_MinSize: {x: 200, y: 56}
   m_MaxSize: {x: 16192, y: 8096}
   vertical: 0
-  controlID: 58
+  controlID: 30
   draggingID: 0
 --- !u!114 &14
 MonoBehaviour:
@@ -393,7 +393,7 @@ MonoBehaviour:
     m_OverlaysVisible: 1
     m_DynamicPanelBehavior: 0
   m_PosLeft: {x: 0, y: 0}
-  m_PosRight: {x: 0, y: 503.10498}
+  m_PosRight: {x: 0, y: 0}
   m_Scope: 1
   m_SplitterPos: 150
   m_SearchText: 
@@ -757,9 +757,7 @@ MonoBehaviour:
     - m_Data: 37914
     m_LastClickedID:
       m_Data: 37914
-    m_ExpandedIDs:
-    - m_Data: 0
-    - m_Data: 37768
+    m_ExpandedIDs: []
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -790,9 +788,7 @@ MonoBehaviour:
     m_SelectedIDs: []
     m_LastClickedID:
       m_Data: 0
-    m_ExpandedIDs:
-    - m_Data: 0
-    - m_Data: 37768
+    m_ExpandedIDs: []
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -949,8 +945,7 @@ MonoBehaviour:
       m_LastClickedID:
         m_Data: 0
       m_ExpandedIDs:
-      - m_Data: -1294
-      - m_Data: 37456
+      - m_Data: -1454
       m_RenameOverlay:
         m_UserAcceptedRename: 0
         m_Name: 
@@ -1501,9 +1496,9 @@ MonoBehaviour:
   m_AudioPlay: 0
   m_DebugDrawModesUseInteractiveLightBakingData: 0
   m_Position:
-    m_Target: {x: 2.075592, y: 0.8585863, z: 1.4715538}
+    m_Target: {x: 0.06049645, y: 0.10838413, z: -5.1964397}
     speed: 2
-    m_Value: {x: 2.075592, y: 0.8585863, z: 1.4715538}
+    m_Value: {x: 0.06049645, y: 0.10838413, z: -5.1964397}
   m_RenderMode: 0
   m_CameraMode:
     drawMode: 0
@@ -1549,13 +1544,13 @@ MonoBehaviour:
     m_GridAxis: 1
     m_gridOpacity: 0.5
   m_Rotation:
-    m_Target: {x: 0.0024046774, y: 0.9874602, z: -0.15713745, w: 0.015110485}
+    m_Target: {x: 0.013902961, y: 0.9847414, z: -0.1461195, w: 0.09363416}
     speed: 2
-    m_Value: {x: 0.0024046772, y: 0.98746014, z: -0.15713745, w: 0.015110485}
+    m_Value: {x: 0.013902961, y: 0.98474145, z: -0.14611952, w: 0.093634166}
   m_Size:
-    m_Target: 3.4737313
+    m_Target: 4.328043
     speed: 2
-    m_Value: 3.4737313
+    m_Value: 4.328043
   m_Ortho:
     m_Target: 0
     speed: 2
