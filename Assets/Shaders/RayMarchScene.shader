@@ -17,6 +17,8 @@ Shader "RayMarchScene"
         _BackfaceCullMin ("Backface Cull Min", Range(0, 1.0)) = 0.1
         _BackfaceCullMax ("Backface Cull Max", Range(0, 1.0)) = 0.5
         _BackfaceCullThreshold ("Backface Cull Threshold", Range(0.0, 1.0)) = 0.0
+        _Metallic ("Metallic", Range(0, 1)) = 0.0
+        _Smoothness ("Smoothness", Range(0, 1)) = 0.5
     }
     SubShader
     {
@@ -37,18 +39,17 @@ Shader "RayMarchScene"
             #pragma shader_feature _BACKFACECULLMODE_DISABLED _BACKFACECULLMODE_ALPHA _BACKFACECULLMODE_DISCARD
             #pragma multi_compile_fog
 
-            // URP lighting and shadow keywords
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            // URP lighting keywords
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-            #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
-            #pragma multi_compile _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
             #pragma multi_compile _ DIRLIGHTMAP_COMBINED
             #pragma multi_compile _ LIGHTMAP_ON
+            #pragma multi_compile _ PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
             #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "SDFLighting.hlsl"
 
             struct appdata
             {
@@ -84,6 +85,8 @@ Shader "RayMarchScene"
                 float _BackfaceCullMin;
                 float _BackfaceCullMax;
                 float _BackfaceCullThreshold;
+                float _Metallic;
+                float _Smoothness;
                 int _MaxSteps;
             CBUFFER_END
 
@@ -313,34 +316,10 @@ Shader "RayMarchScene"
                 return float2(lo, float(i) / float(_MaxSteps));
             }
 
-            float3 GetLighting(float3 p, float3 worldNormal)
+            float3 GetAlbedo(float3 p)
             {
-                #if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE) || defined(_MAIN_LIGHT_SHADOWS_SCREEN)
-                    float4 shadowCoord = TransformWorldToShadowCoord(p);
-                    Light mainLight = GetMainLight(shadowCoord);
-                #else
-                    Light mainLight = GetMainLight();
-                #endif
-
-                half nl = max(0, dot(worldNormal, mainLight.direction));
-                float3 col = nl * mainLight.color * mainLight.shadowAttenuation * mainLight.distanceAttenuation;
-
-                // Ambient / spherical harmonics
-                col += SampleSH(worldNormal);
-
-                #ifdef _ADDITIONAL_LIGHTS
-                    int additionalLightsCount = GetAdditionalLightsCount();
-                    for (int j = 0; j < additionalLightsCount; ++j)
-                    {
-                        Light light = GetAdditionalLight(j, p);
-                        half addNL = max(0, dot(worldNormal, light.direction));
-                        col += addNL * light.color * light.shadowAttenuation * light.distanceAttenuation;
-                    }
-                #endif
-
-                // Per-primitive coloring: modulate RGB by distance to each SDF primitive
-                col *= 1 - float3(GetDistToSphere(p), GetDistToTorus(p), GetDistToBox(p));
-                return col;
+                // Per-primitive coloring: each channel driven by proximity to one SDF primitive
+                return saturate(1 - float3(GetDistToSphere(p), GetDistToTorus(p), GetDistToBox(p)));
             }
 
             void frag(v2f i, out float4 color : SV_Target, out float depth : SV_Depth)
@@ -371,10 +350,20 @@ Shader "RayMarchScene"
                 }
 
                 float3 p = ro + d * rd;
-                float3 worldNormal = GetNormal(p);
-                col.rgb = GetLighting(p, worldNormal);
+                float4 clipSpacePos = TransformWorldToHClip(p);
+                half3 normalWS = normalize(half3(GetNormal(p)));
 
-                float ndotv = dot(worldNormal, rd);
+                SurfaceData surfaceData = (SurfaceData)0;
+                surfaceData.albedo     = half3(GetAlbedo(p));
+                surfaceData.metallic   = (half)_Metallic;
+                surfaceData.smoothness = (half)_Smoothness;
+                surfaceData.occlusion  = 1.0h;
+                surfaceData.alpha      = 1.0h;
+                surfaceData.normalTS   = half3(0, 0, 1);
+
+                col.rgb = SDFLighting(p, normalWS, clipSpacePos, surfaceData);
+
+                float ndotv = dot(normalWS, rd);
                 #if defined(_BACKFACECULLMODE_DISCARD)
                     if (ndotv > _BackfaceCullThreshold) discard;
                 #elif defined(_BACKFACECULLMODE_ALPHA)
@@ -382,8 +371,6 @@ Shader "RayMarchScene"
                 #endif
 
                 color = saturate(col);
-
-                float4 clipSpacePos = TransformWorldToHClip(p);
                 depth = clipSpacePos.z / clipSpacePos.w;
             }
             ENDHLSL

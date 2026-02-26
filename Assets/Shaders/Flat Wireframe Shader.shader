@@ -14,11 +14,7 @@ Shader "Custom/Flat Wireframe" {
     }
 
     SubShader {
-        Tags {
-            "RenderType"     = "Opaque"
-            "RenderPipeline" = "UniversalPipeline"
-            "Queue"          = "Geometry"
-        }
+        Tags { "RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" "Queue" = "Geometry" }
 
         Pass {
             Name "ForwardLit"
@@ -38,6 +34,7 @@ Shader "Custom/Flat Wireframe" {
             #pragma multi_compile _ _MIXED_LIGHTING_SUBTRACTIVE
             #pragma multi_compile _ DIRLIGHTMAP_COMBINED
             #pragma multi_compile _ LIGHTMAP_ON
+            #pragma multi_compile _ PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
             #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -104,9 +101,9 @@ Shader "Custom/Flat Wireframe" {
                 inputData.normalWS            = normalWS;
                 inputData.viewDirectionWS     = SafeNormalize(GetCameraPositionWS() - IN.positionWS);
                 inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(IN.positionHCS);
-                inputData.bakedGI             = SampleSH(normalWS);
+                inputData.bakedGI = SampleSH(inputData.normalWS);
                 inputData.shadowMask          = unity_ProbesOcclusion;
-                #if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE) || defined(_MAIN_LIGHT_SHADOWS_SCREEN)
+                #if defined(MAIN_LIGHT_CALCULATE_SHADOWS)
                     inputData.shadowCoord = TransformWorldToShadowCoord(IN.positionWS);
                 #else
                     inputData.shadowCoord = float4(0, 0, 0, 0);
@@ -131,10 +128,17 @@ Shader "Custom/Flat Wireframe" {
                 barys            = smoothstep(thickness, thickness + smoothing, barys);
                 float  minBary   = min(barys.x, min(barys.y, barys.z));
 
-                float3 finalColor = lerp(_WireframeColor.rgb, litColor, minBary);
+                float3 finalColor = lerp(litColor * (1 - _WireframeColor.a) + _WireframeColor.rgb * _WireframeColor.a, litColor, minBary);
                 return float4(finalColor, albedo.a);
             }
             ENDHLSL
         }
+
+        // Required for casting shadows onto other objects.
+        UsePass "Universal Render Pipeline/Lit/ShadowCaster"
+
+        // Required for the depth prepass — without this the mesh is absent from the
+        // depth buffer and screen-space shadows cannot resolve against it.
+        UsePass "Universal Render Pipeline/Lit/DepthOnly"
     }
 }
