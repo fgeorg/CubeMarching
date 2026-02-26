@@ -15,11 +15,11 @@ public class RayMarchMaterialEditor : ShaderGUI {
             var p = FindProperty(name, properties);
             float clamped = Mathf.Clamp(p.floatValue, min, max);
 
-            Rect rect  = EditorGUILayout.GetControlRect();
+            Rect rect = EditorGUILayout.GetControlRect();
             Rect right = EditorGUI.PrefixLabel(rect, new GUIContent(p.displayName));
-            float fw         = EditorGUIUtility.fieldWidth;
-            Rect  sliderRect = new Rect(right.x,        right.y, right.width - fw - 4, right.height);
-            Rect  fieldRect  = new Rect(right.xMax - fw, right.y, fw,                  right.height);
+            float fw = EditorGUIUtility.fieldWidth;
+            Rect sliderRect = new Rect(right.x, right.y, right.width - fw - 4, right.height);
+            Rect fieldRect = new Rect(right.xMax - fw, right.y, fw, right.height);
 
             EditorGUI.BeginChangeCheck();
             float newLog = GUI.HorizontalSlider(sliderRect, Mathf.Log10(clamped), Mathf.Log10(min), Mathf.Log10(max));
@@ -33,7 +33,7 @@ public class RayMarchMaterialEditor : ShaderGUI {
         editor.ShaderProperty(marchMode, marchMode.displayName);
         Draw("_MaxSteps");
         Draw("_MaxDist");
-        DrawLog("_SurfDist",   1e-7f, 0.1f);
+        DrawLog("_SurfDist", 1e-7f, 0.1f);
         DrawLog("_NormalDist", 1e-7f, 0.1f);
         Draw("_StepFactor");
 
