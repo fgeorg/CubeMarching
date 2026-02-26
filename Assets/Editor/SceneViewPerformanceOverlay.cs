@@ -50,15 +50,30 @@ public static class SceneViewPerformanceOverlay
 
         Handles.BeginGUI();
 
-        EditorGUI.DrawRect(new Rect(50, 10, 150, 65), new Color(0, 0, 0, 0.7f));
+        int extraLines = DebugStore.Count;
+        float boxHeight = 70f + (extraLines > 0 ? extraLines * 20f : 0f);
+        EditorGUI.DrawRect(new Rect(50, 10, 165, boxHeight), new Color(0, 0, 0, 0.7f));
 
         GUIStyle style = new GUIStyle(EditorStyles.boldLabel);
         style.normal.textColor = Color.green;
-        GUI.Label(new Rect(55, 15, 140, 20), $"FPS: {displayFps:F0}", style);
+        GUI.Label(new Rect(55, 15, 155, 20), $"FPS: {displayFps:F0}", style);
 
         style.normal.textColor = Color.white;
-        GUI.Label(new Rect(55, 35, 140, 20), $"CPU: {displayCpuMs:F2} ms", style);
-        GUI.Label(new Rect(55, 55, 140, 20), $"GPU: {displayGpuMs:F2} ms", style);
+        GUI.Label(new Rect(55, 35, 155, 20), $"CPU: {displayCpuMs:F2} ms", style);
+        GUI.Label(new Rect(55, 55, 155, 20), $"GPU: {displayGpuMs:F2} ms", style);
+
+        if (extraLines > 0)
+        {
+            float y = 75f;
+            style.normal.textColor = new Color(1f, 0.85f, 0.3f); // warm yellow
+            var it = DebugStore.GetEnumerator();
+            while (it.MoveNext())
+            {
+                GUI.Label(new Rect(55, y, 155, 20), $"{it.Current.Key}: {it.Current.Value}", style);
+                y += 20f;
+            }
+            it.Dispose();
+        }
 
         Handles.EndGUI();
 
