@@ -15,9 +15,9 @@ public class SdfNodeComponent : MonoBehaviour
     }
 
     public SdfNodeType nodeType = SdfNodeType.Sphere;
-    public float sphereRadius      = 0.5f;
-    public float boxCornerRadius   = 0f;
-    public float torusMajorRadius  = 0.4f;
-    public float torusMinorRadius  = 0.15f;
-    public float smoothK           = 0.3f;
+    public float   sphereRadius     = 0.5f;
+    public Vector3 boxHalfExtents   = new Vector3(0.5f, 0.5f, 0.5f);
+    public float   torusMajorRadius = 0.4f;
+    public float   torusMinorRadius = 0.15f;
+    public float   smoothK          = 0.3f;
 }

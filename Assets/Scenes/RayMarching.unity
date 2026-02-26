@@ -156,6 +156,105 @@ Transform:
   - {fileID: 884071956}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &60417028
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 60417029}
+  - component: {fileID: 60417030}
+  m_Layer: 0
+  m_Name: SmoothUnion
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &60417029
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 60417028}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.915, y: 1.358, z: 0.202}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 591366728}
+  - {fileID: 436188479}
+  m_Father: {fileID: 98876506}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &60417030
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 60417028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
+  nodeType: 11
+  sphereRadius: 0.65
+  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
+  torusMajorRadius: 0.4
+  torusMinorRadius: 0.15
+  smoothK: 0.54
+--- !u!1 &98876504
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 98876506}
+  - component: {fileID: 98876505}
+  m_Layer: 0
+  m_Name: SdfScene
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &98876505
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 98876504}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9d73ee2ea32d4eeabf356f0abe0ead6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SdfScene
+  _SdfWindow: {fileID: 5038652750243243538}
+--- !u!4 &98876506
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 98876504}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 60417029}
+  - {fileID: 1728739226}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &328968471
 GameObject:
   m_ObjectHideFlags: 0
@@ -221,6 +320,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 328968472}
   m_LocalEulerAnglesHint: {x: -25.523, y: -1150.37, z: 6.171}
+--- !u!1 &436188478
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 436188479}
+  - component: {fileID: 436188480}
+  m_Layer: 0
+  m_Name: Torus
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &436188479
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 436188478}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -0.559, y: 0.347, z: -0.115}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 60417029}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &436188480
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 436188478}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
+  nodeType: 2
+  sphereRadius: 0.23
+  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
+  torusMajorRadius: 0.4
+  torusMinorRadius: 0.15
+  smoothK: 0.3
 --- !u!1 &450753637
 GameObject:
   m_ObjectHideFlags: 0
@@ -376,6 +525,56 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!1 &591366727
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 591366728}
+  - component: {fileID: 591366729}
+  m_Layer: 0
+  m_Name: Box
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &591366728
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 591366727}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0.056, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 60417029}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &591366729
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 591366727}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
+  nodeType: 1
+  sphereRadius: 0.65
+  boxHalfExtents: {x: 0.31, y: 0.51, z: 0.65}
+  torusMajorRadius: 0.4
+  torusMinorRadius: 0.15
+  smoothK: 0.3
 --- !u!1 &785420950
 GameObject:
   m_ObjectHideFlags: 0
@@ -629,6 +828,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 328968472}
   m_LocalEulerAnglesHint: {x: -33.405, y: -413.32, z: 48.327}
+--- !u!1 &1728739225
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1728739226}
+  - component: {fileID: 1728739227}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1728739226
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1728739225}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -0.306, y: 1.759, z: 0.202}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 98876506}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1728739227
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1728739225}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
+  nodeType: 0
+  sphereRadius: 0.23
+  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
+  torusMajorRadius: 0.4
+  torusMinorRadius: 0.15
+  smoothK: 0.3
 --- !u!1 &119734848978804391
 GameObject:
   m_ObjectHideFlags: 0
@@ -2518,7 +2767,6 @@ GameObject:
   - component: {fileID: 4276955666017760553}
   - component: {fileID: 1409032778547661923}
   - component: {fileID: 2497344922925148407}
-  - component: {fileID: 5038652750243243539}
   m_Layer: 0
   m_Name: InvertedCube Window
   m_TagString: Untagged
@@ -2526,21 +2774,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &5038652750243243539
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5038652750243243538}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7781d517e2c0d4ecab1cd6ea456d6734, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PassTransformsToShader
-  _torus: {fileID: 1675719821}
-  _sphere: {fileID: 785420951}
-  _box: {fileID: 413707513}
 --- !u!23 &5059788001983007760
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -4359,3 +4592,4 @@ SceneRoots:
   - {fileID: 1276148452}
   - {fileID: 328968472}
   - {fileID: 4276955666017760553}
+  - {fileID: 98876506}

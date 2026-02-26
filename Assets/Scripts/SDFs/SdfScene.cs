@@ -112,7 +112,7 @@ public class SdfScene : MonoBehaviour
                 p = new Vector4(0, node.sphereRadius, 0, 0);
                 break;
             case SdfNodeComponent.SdfNodeType.Box:
-                p = new Vector4(1, node.boxCornerRadius, 0, 0);
+                p = new Vector4(1, node.boxHalfExtents.x, node.boxHalfExtents.y, node.boxHalfExtents.z);
                 break;
             default: // Torus
                 p = new Vector4(2, node.torusMajorRadius, node.torusMinorRadius, 0);

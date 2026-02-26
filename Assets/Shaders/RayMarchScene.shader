@@ -152,10 +152,9 @@ Shader "RayMarchScene"
                             d = length(lp) - node.typeAndParams.y;
                         else if (t == 1) // Box
                         {
-                            float cr = node.typeAndParams.y;
-                            float3 bh = float3(0.5, 0.5, 0.5) * (1.0 - 2.0 * cr);
+                            float3 bh = node.typeAndParams.yzw;
                             float3 q = abs(lp) - bh;
-                            d = length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - cr;
+                            d = length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
                         }
                         else // Torus
                         {
