@@ -87,6 +87,22 @@ public class SdfScene : MonoBehaviour
         {
             list.Add(MakePrimitive(node));
         }
+        else if ((int)node.nodeType >= 20) // unary modifier
+        {
+            // Union all children together first, then apply the modifier.
+            bool first = true;
+            foreach (Transform child in node.transform)
+            {
+                if (!child.gameObject.activeInHierarchy) continue;
+                SdfNodeComponent childNode = child.GetComponent<SdfNodeComponent>();
+                if (childNode == null) continue;
+                TraversePostOrder(childNode, list);
+                if (!first) list.Add(MakeOp(SdfNodeComponent.SdfNodeType.Union, 0f));
+                first = false;
+            }
+            if (!first) // had at least one child
+                list.Add(MakeUnary(node));
+        }
         else
         {
             // interleave: [C1, C2, op, C3, op, ...] keeps stack depth at 2
@@ -121,11 +137,39 @@ public class SdfScene : MonoBehaviour
         return new GpuSdfNode { typeAndParams = p, transform = node.transform.worldToLocalMatrix };
     }
 
-    private static GpuSdfNode MakeOp(SdfNodeComponent.SdfNodeType type, float smoothK)
+    private static GpuSdfNode MakeUnary(SdfNodeComponent node)
     {
+        float param = node.nodeType == SdfNodeComponent.SdfNodeType.Shell
+            ? node.shellThickness
+            : node.expandAmount;
         return new GpuSdfNode
         {
-            typeAndParams = new Vector4((int)type, smoothK, 0, 0),
+            typeAndParams = new Vector4((int)node.nodeType, param, 0, 0),
+            transform     = Matrix4x4.identity
+        };
+    }
+
+    // GPU-only smooth-variant type IDs (not in the C# enum).
+    // Must match #define SDF_SMOOTH_* in Assets/Shaders/SdfNodeTypes.hlsl.
+    private const int GpuSmoothUnion     = 11;
+    private const int GpuSmoothIntersect = 14;
+    private const int GpuSmoothSubtract  = 15;
+
+    private static GpuSdfNode MakeOp(SdfNodeComponent.SdfNodeType type, float smoothK)
+    {
+        // Automatically pick smooth vs sharp variant based on k.
+        bool smooth = smoothK > 0f;
+        int gpuType;
+        switch (type)
+        {
+            case SdfNodeComponent.SdfNodeType.Union:     gpuType = smooth ? GpuSmoothUnion     : (int)type; break;
+            case SdfNodeComponent.SdfNodeType.Intersect: gpuType = smooth ? GpuSmoothIntersect : (int)type; break;
+            case SdfNodeComponent.SdfNodeType.Subtract:  gpuType = smooth ? GpuSmoothSubtract  : (int)type; break;
+            default:                                      gpuType = (int)type;                               break;
+        }
+        return new GpuSdfNode
+        {
+            typeAndParams = new Vector4(gpuType, smoothK, 0, 0),
             transform     = Matrix4x4.identity
         };
     }

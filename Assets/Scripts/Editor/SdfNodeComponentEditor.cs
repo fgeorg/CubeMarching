@@ -34,10 +34,17 @@ public class SdfNodeComponentEditor : Editor
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("torusMajorRadius"), new GUIContent("Major Radius"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("torusMinorRadius"), new GUIContent("Minor Radius"));
                 break;
-            case SdfNodeComponent.SdfNodeType.SmoothUnion:
+            case SdfNodeComponent.SdfNodeType.Union:
+            case SdfNodeComponent.SdfNodeType.Intersect:
+            case SdfNodeComponent.SdfNodeType.Subtract:
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("smoothK"), new GUIContent("Smooth K"));
                 break;
-            // Union, Intersect, Subtract have no extra params
+            case SdfNodeComponent.SdfNodeType.Shell:
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("shellThickness"), new GUIContent("Thickness"));
+                break;
+            case SdfNodeComponent.SdfNodeType.Expand:
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("expandAmount"), new GUIContent("Amount"));
+                break;
         }
 
         serializedObject.ApplyModifiedProperties();

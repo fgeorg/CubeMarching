@@ -51,6 +51,7 @@ Shader "RayMarchScene"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "SDFLighting.hlsl"
+            #include "SdfNodeTypes.hlsl"
 
             struct appdata
             {
@@ -107,73 +108,131 @@ Shader "RayMarchScene"
                 return o;
             }
 
-            // https://iquilezles.org/articles/smin/
-
-            float SMinPoly(float a, float b, float k)
+            // Smooth boolean ops — https://iquilezles.org/articles/smin/
+            float SmoothUnion(float a, float b, float k)
             {
-                float h = max(k - abs(a - b), 0.0) / k;
-                return min(a, b) - h * h * k * (1.0 / 4.0);
+                float h = max(k - abs(a - b), 0.0);
+                return min(a, b) - h * h * 0.25 / k;
+            }
+            float SmoothSubtract(float a, float b, float k)  { return -SmoothUnion(-a, b, k); }
+            float SmoothIntersect(float a, float b, float k)  { return -SmoothUnion(-a, -b, k); }
+
+            #define STACK_SIZE 16
+            struct SdfStack
+            {
+                float s0, s1, s2, s3, s4, s5, s6, s7;
+                float s8, s9, s10, s11, s12, s13, s14, s15;
+            };
+
+            void SetStackValue(inout SdfStack stack, int index, float val)
+            {
+                switch(index)
+                {
+                    case 0: stack.s0 = val; break;
+                    case 1: stack.s1 = val; break;
+                    case 2: stack.s2 = val; break;
+                    case 3: stack.s3 = val; break;
+                    case 4: stack.s4 = val; break;
+                    case 5: stack.s5 = val; break;
+                    case 6: stack.s6 = val; break;
+                    case 7: stack.s7 = val; break;
+                    case 8: stack.s8 = val; break;
+                    case 9: stack.s9 = val; break;
+                    case 10: stack.s10 = val; break;
+                    case 11: stack.s11 = val; break;
+                    case 12: stack.s12 = val; break;
+                    case 13: stack.s13 = val; break;
+                    case 14: stack.s14 = val; break;
+                    case 15: stack.s15 = val; break;
+                }
             }
 
-            float SMinCubic(float a, float b, float k)
+            float GetStackValue(SdfStack stack, int index)
             {
-                float h = max(k - abs(a - b), 0.0) / k;
-                return min(a, b) - h * h * h * k * (1.0 / 6.0);
+                switch(index)
+                {
+                    case 0: return stack.s0;
+                    case 1: return stack.s1;
+                    case 2: return stack.s2;
+                    case 3: return stack.s3;
+                    case 4: return stack.s4;
+                    case 5: return stack.s5;
+                    case 6: return stack.s6;
+                    case 7: return stack.s7;
+                    case 8: return stack.s8;
+                    case 9: return stack.s9;
+                    case 10: return stack.s10;
+                    case 11: return stack.s11;
+                    case 12: return stack.s12;
+                    case 13: return stack.s13;
+                    case 14: return stack.s14;
+                    case 15: return stack.s15;
+                }
+                return 1e10; // Should not be reached
             }
 
-            float SMinExp(float a, float b, float k)
-            {
-                float res = exp2(-k * a) + exp2(-k * b);
-                return -log2(res) / k;
-            }
-
-            float SMinPow(float a, float b, float k)
-            {
-                a = pow(a, k); b = pow(b, k);
-                return pow((a * b) / (a + b), 1.0 / k);
-            }
-
-            // Buffer is interleaved [C1, C2, op, C3, op, ...] so depth is always 2.
-            // No stack needed — just two floats: a (accumulator) and b (incoming operand).
+            // Postfix stack evaluator. Primitives push; binary ops pop two and push result;
+            // unary ops modify top in place. Stack depth 16 handles any realistic scene tree.
             float EvalScene(float3 p)
             {
-                float a = 0.0, b = 0.0;
-                bool firstPrim = true;
+                SdfStack stack = (SdfStack)0;
+                int sp = 0;
                 [loop]
                 for (int i = 0; i < min(_SdfNodeCount, 64); i++)
                 {
                     SdfNode node = _SdfNodes[i];
                     int t = (int)node.typeAndParams.x;
-                    if (t < 10) // primitive
+                    float k = node.typeAndParams.y;
+                    if (t < SDF_UNION) // primitive — push
                     {
                         float3 lp = mul(node.transform, float4(p, 1.0)).xyz;
                         float d;
-                        if (t == 0) // Sphere
+                        if (t == SDF_SPHERE)
                             d = length(lp) - node.typeAndParams.y;
-                        else if (t == 1) // Box
+                        else if (t == SDF_BOX)
                         {
                             float3 bh = node.typeAndParams.yzw;
                             float3 q = abs(lp) - bh;
                             d = length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
                         }
-                        else // Torus
+                        else // SDF_TORUS
                         {
                             float2 q2 = float2(length(lp.xy) - node.typeAndParams.y, lp.z);
                             d = length(q2) - node.typeAndParams.z;
                         }
-                        if (firstPrim) { a = d; firstPrim = false; }
-                        else b = d;
+                        if (sp < 16)
+                        {
+                            SetStackValue(stack, sp, d);
+                            sp++;
+                        }
                     }
-                    else // operator
+                    else if (t >= SDF_SHELL) // unary modifier — modify top in place
                     {
-                        float k = node.typeAndParams.y;
-                        if      (t == 10) a = min(a, b);
-                        else if (t == 11) a = SMinCubic(a, b, k);
-                        else if (t == 12) a = max(a, b);
-                        else              a = max(a, -b);
+                        if (sp >= 1)
+                        {
+                            float top = GetStackValue(stack, sp - 1);
+                            if (t == SDF_SHELL) SetStackValue(stack, sp - 1, abs(top) - k);
+                            else                SetStackValue(stack, sp - 1, top + k); // SDF_EXPAND
+                        }
+                    }
+                    else if (sp >= 2) // binary operator — pop two, push result
+                    {
+                        sp--;
+                        float b = GetStackValue(stack, sp);
+                        sp--;
+                        float a = GetStackValue(stack, sp);
+                        float r;
+                        if      (t == SDF_UNION)            r = min(a, b);
+                        else if (t == SDF_SMOOTH_UNION)     r = SmoothUnion(a, b, k);
+                        else if (t == SDF_INTERSECT)        r = max(a, b);
+                        else if (t == SDF_SUBTRACT)         r = max(a, -b);
+                        else if (t == SDF_SMOOTH_INTERSECT) r = SmoothIntersect(a, b, k);
+                        else                                r = SmoothSubtract(a, b, k); // SDF_SMOOTH_SUBTRACT
+                        SetStackValue(stack, sp, r);
+                        sp++;
                     }
                 }
-                return firstPrim ? 1e10 : a;
+                return sp > 0 ? GetStackValue(stack, 0) : 1e10;
             }
 
             float3 GetNormal(float3 p)

@@ -17,14 +17,17 @@ public static class SdfNodeMenus
     [MenuItem("GameObject/SDFs/Operations/Union", false, 2)]
     static void CreateUnion(MenuCommand cmd) => Create("Union", SdfNodeComponent.SdfNodeType.Union, cmd);
 
-    [MenuItem("GameObject/SDFs/Operations/SmoothUnion", false, 2)]
-    static void CreateSmoothUnion(MenuCommand cmd) => Create("SmoothUnion", SdfNodeComponent.SdfNodeType.SmoothUnion, cmd);
-
     [MenuItem("GameObject/SDFs/Operations/Intersect", false, 2)]
     static void CreateIntersect(MenuCommand cmd) => Create("Intersect", SdfNodeComponent.SdfNodeType.Intersect, cmd);
 
     [MenuItem("GameObject/SDFs/Operations/Subtract", false, 2)]
     static void CreateSubtract(MenuCommand cmd) => Create("Subtract", SdfNodeComponent.SdfNodeType.Subtract, cmd);
+
+    [MenuItem("GameObject/SDFs/Operations/Shell", false, 2)]
+    static void CreateShell(MenuCommand cmd) => Create("Shell", SdfNodeComponent.SdfNodeType.Shell, cmd);
+
+    [MenuItem("GameObject/SDFs/Operations/Expand", false, 2)]
+    static void CreateExpand(MenuCommand cmd) => Create("Expand", SdfNodeComponent.SdfNodeType.Expand, cmd);
 
     // ── Shared helper ─────────────────────────────────────────────────────────
     static void Create(string name, SdfNodeComponent.SdfNodeType type, MenuCommand cmd)
