@@ -19,6 +19,7 @@ Shader "RayMarchScene"
         _BackfaceCullThreshold ("Backface Cull Threshold", Range(0.0, 1.0)) = 0.0
         _Metallic ("Metallic", Range(0, 1)) = 0.0
         _Smoothness ("Smoothness", Range(0, 1)) = 0.5
+        [HideInInspector] _SdfNodeCount ("SdfNodeCount", Int) = 0
     }
     SubShader
     {
@@ -34,7 +35,7 @@ Shader "RayMarchScene"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
-            #pragma target 3.0
+            #pragma target 4.5
             #pragma shader_feature _MARCHMODE_SIMPLE _MARCHMODE_ENHANCED _MARCHMODE_SECANT _MARCHMODE_BINARY
             #pragma shader_feature _BACKFACECULLMODE_DISABLED _BACKFACECULLMODE_ALPHA _BACKFACECULLMODE_DISCARD
             #pragma multi_compile_fog
@@ -71,9 +72,6 @@ Shader "RayMarchScene"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
-                float4x4 _TorusTransform;
-                float4x4 _SphereTransform;
-                float4x4 _BoxTransform;
                 float _SMinKValue;
                 float _MaxDist;
                 float _SurfDist;
@@ -88,7 +86,15 @@ Shader "RayMarchScene"
                 float _Metallic;
                 float _Smoothness;
                 int _MaxSteps;
+                int _SdfNodeCount;
             CBUFFER_END
+
+            struct SdfNode
+            {
+                float4 typeAndParams; // x=type, y=param0, z=param1, w=param2
+                float4x4 transform;
+            };
+            StructuredBuffer<SdfNode> _SdfNodes;
 
             v2f vert(appdata v)
             {
@@ -96,13 +102,12 @@ Shader "RayMarchScene"
                 UNITY_SETUP_INSTANCE_ID(v);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
-                // ray origin and hit position in world space
                 o.ro = _WorldSpaceCameraPos;
                 o.hitPos = TransformObjectToWorld(v.vertex.xyz);
                 return o;
             }
 
-            // https://www.iquilezles.org/www/articles/smin/smin.htm
+            // https://iquilezles.org/articles/smin/
 
             float SMinPoly(float a, float b, float k)
             {
@@ -128,41 +133,58 @@ Shader "RayMarchScene"
                 return pow((a * b) / (a + b), 1.0 / k);
             }
 
-            float GetDistToSphere(float3 p)
+            // Buffer is interleaved [C1, C2, op, C3, op, ...] so depth is always 2.
+            // No stack needed — just two floats: a (accumulator) and b (incoming operand).
+            float EvalScene(float3 p)
             {
-                p = mul(_SphereTransform, float4(p, 1)).xyz;
-                return length(p) - 0.6;
-            }
-
-            float GetDistToTorus(float3 p)
-            {
-                p = mul(_TorusTransform, float4(p, 1)).xyz;
-                return length(float2(length(p.xy) - .4, p.z)) - .15;
-            }
-
-            float GetDistToBox(float3 p)
-            {
-                p = mul(_BoxTransform, float4(p, 1)).xyz;
-                float3 q = abs(p) - 0.5;
-                return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
-            }
-
-            float GetDist(float3 p)
-            {
-                float dSphere = GetDistToSphere(p);
-                float dTorus = GetDistToTorus(p);
-                float dBox = GetDistToBox(p);
-                return SMinPoly(dBox, SMinPoly(dSphere, dTorus, _SMinKValue), _SMinKValue);
+                float a = 0.0, b = 0.0;
+                bool firstPrim = true;
+                [loop]
+                for (int i = 0; i < min(_SdfNodeCount, 64); i++)
+                {
+                    SdfNode node = _SdfNodes[i];
+                    int t = (int)node.typeAndParams.x;
+                    if (t < 10) // primitive
+                    {
+                        float3 lp = mul(node.transform, float4(p, 1.0)).xyz;
+                        float d;
+                        if (t == 0) // Sphere
+                            d = length(lp) - node.typeAndParams.y;
+                        else if (t == 1) // Box
+                        {
+                            float cr = node.typeAndParams.y;
+                            float3 bh = float3(0.5, 0.5, 0.5) * (1.0 - 2.0 * cr);
+                            float3 q = abs(lp) - bh;
+                            d = length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - cr;
+                        }
+                        else // Torus
+                        {
+                            float2 q2 = float2(length(lp.xy) - node.typeAndParams.y, lp.z);
+                            d = length(q2) - node.typeAndParams.z;
+                        }
+                        if (firstPrim) { a = d; firstPrim = false; }
+                        else b = d;
+                    }
+                    else // operator
+                    {
+                        float k = node.typeAndParams.y;
+                        if      (t == 10) a = min(a, b);
+                        else if (t == 11) a = SMinCubic(a, b, k);
+                        else if (t == 12) a = max(a, b);
+                        else              a = max(a, -b);
+                    }
+                }
+                return firstPrim ? 1e10 : a;
             }
 
             float3 GetNormal(float3 p)
             {
                 float2 e = float2(_NormalDist, 0);
                 float3 n = float3(
-                    GetDist(p + e.xyy),
-                    GetDist(p + e.yxy),
-                    GetDist(p + e.yyx)
-                ) - GetDist(p);
+                    EvalScene(p + e.xyy),
+                    EvalScene(p + e.yxy),
+                    EvalScene(p + e.yyx)
+                ) - EvalScene(p);
                 return normalize(n);
             }
 
@@ -173,7 +195,7 @@ Shader "RayMarchScene"
                 for (; i < _MaxSteps; i++)
                 {
                     float3 p = ro + dO * rd;
-                    float dS = GetDist(p);
+                    float dS = EvalScene(p);
                     if (dS < _SurfDist || dO > _MaxDist) break;
                     dO += dS * _StepFactor;
                 }
@@ -181,9 +203,6 @@ Shader "RayMarchScene"
             }
 
             // Enhanced Sphere Tracing - Keinert et al. 2014
-            // Uses relaxed steps (omega > 1) and partially rolls back when an overstep is detected.
-            // prevRadius and convergence are only updated on non-failed steps to avoid using
-            // values sampled at the (potentially invalid) overstepped position.
             float2 RayMarch(float3 ro, float3 rd)
             {
                 float omega = _Omega;
@@ -194,10 +213,7 @@ Shader "RayMarchScene"
 
                 for (; i < _MaxSteps && dO < _MaxDist; i++)
                 {
-                    float radius = GetDist(ro + rd * dO);
-
-                    // Overstep detection: the safe spheres at consecutive steps must overlap.
-                    // If prevRadius + radius < stepLength they don't, so we overstepped.
+                    float radius = EvalScene(ro + rd * dO);
                     bool sorFailed = omega > 1.0 && (radius + prevRadius) < stepLength;
 
                     if (sorFailed)
@@ -217,53 +233,40 @@ Shader "RayMarchScene"
                 return float2(dO, float(i) / float(_MaxSteps));
             }
 
-            // Secant refinement.
-            // Phase 1: standard sphere trace, stop when dS < _CoarseThresh.
-            // Phase 2: secant method — linearly predicts where dS reaches 0 using the two
-            //          most recent samples. One GetDist call per step, superlinear convergence.
-            //          If the secant step lands inside the surface (dS < 0), falls back to
-            //          bisection on the bracketed interval.
+            // Secant refinement
             float2 RayMarchSecant(float3 ro, float3 rd)
             {
-                // t0/f0 = previous sample, t1/f1 = current sample
-                float t0 = 0, f0 = _CoarseThresh * 2.0; // dummy: outside coarse zone
+                float t0 = 0, f0 = _CoarseThresh * 2.0;
                 float t1 = 0, f1 = 0;
                 int i = 0;
 
-                // Phase 1: sphere trace until within _CoarseThresh
                 for (; i < _MaxSteps && t1 < _MaxDist; i++)
                 {
-                    f1 = GetDist(ro + rd * t1);
+                    f1 = EvalScene(ro + rd * t1);
                     if (f1 < _SurfDist) return float2(t1, float(i) / float(_MaxSteps));
                     if (f1 < _CoarseThresh) break;
                     t0 = t1; f0 = f1;
                     t1 += f1 * _StepFactor;
                 }
 
-                // If we never entered the coarse zone, the ray missed
                 if (f1 >= _CoarseThresh) return float2(t1, float(i) / float(_MaxSteps));
 
-                // Phase 2: secant method
                 for (; i < _MaxSteps; i++)
                 {
                     float denom = f1 - f0;
-                    // Secant step: extrapolate linearly to where dS = 0.
-                    // Clamped to [t1, t1 + f1] so it can't diverge past one safe sphere step.
                     float t2 = (abs(denom) > 1e-7) ? t1 - f1 * (t1 - t0) / denom : t1 + f1;
                     t2 = clamp(t2, t1, t1 + f1);
-                    float f2 = GetDist(ro + rd * t2);
+                    float f2 = EvalScene(ro + rd * t2);
 
                     if (abs(f2) < _SurfDist) return float2(t2, float(i) / float(_MaxSteps));
 
-                    // Secant stepped inside the surface — now we have a proper bracket.
-                    // Bisect between t1 (outside) and t2 (inside).
                     if (f2 < 0.0)
                     {
                         float lo = t1, hi = t2;
                         for (int b = 0; b < 8; b++)
                         {
                             float mid = (lo + hi) * 0.5;
-                            float fMid = GetDist(ro + rd * mid);
+                            float fMid = EvalScene(ro + rd * mid);
                             if (abs(fMid) < _SurfDist) return float2(mid, 1.0);
                             if (fMid < 0.0) hi = mid; else lo = mid;
                         }
@@ -277,13 +280,7 @@ Shader "RayMarchScene"
                 return float2(t1, float(i) / float(_MaxSteps));
             }
 
-            // Pure binary search.
-            // Phase 1: standard sphere trace with step = dS * (1 + _OvershootEps).
-            //          The epsilon overcomes smin's underestimation, eventually stepping
-            //          inside the surface and getting a negative dS reading.
-            // Phase 2: classic bisection on the bracketed interval [lo, hi] where
-            //          dS(lo) > 0 and dS(hi) < 0. Halves the interval each step —
-            //          no risk of divergence, guaranteed convergence.
+            // Pure binary search
             float2 RayMarchBinary(float3 ro, float3 rd)
             {
                 float lo = 0;
@@ -291,10 +288,9 @@ Shader "RayMarchScene"
                 int i = 0;
                 bool bracketed = false;
 
-                // Phase 1: march with overshoot until we step inside the surface
                 for (; i < _MaxSteps && dO < _MaxDist; i++)
                 {
-                    float dS = GetDist(ro + rd * dO);
+                    float dS = EvalScene(ro + rd * dO);
                     if (dS < _SurfDist) return float2(dO, float(i) / float(_MaxSteps));
                     if (dS < 0.0) { bracketed = true; break; }
                     lo = dO;
@@ -303,12 +299,11 @@ Shader "RayMarchScene"
 
                 if (!bracketed) return float2(dO, float(i) / float(_MaxSteps));
 
-                // Phase 2: bisect [lo, dO] — lo is outside (dS > 0), dO is inside (dS < 0)
                 float hi = dO;
                 for (; i < _MaxSteps; i++)
                 {
                     float mid = (lo + hi) * 0.5;
-                    float fMid = GetDist(ro + rd * mid);
+                    float fMid = EvalScene(ro + rd * mid);
                     if (abs(fMid) < _SurfDist) return float2(mid, float(i) / float(_MaxSteps));
                     if (fMid < 0.0) hi = mid; else lo = mid;
                 }
@@ -316,15 +311,16 @@ Shader "RayMarchScene"
                 return float2(lo, float(i) / float(_MaxSteps));
             }
 
-            float3 GetAlbedo(float3 p)
-            {
-                // Per-primitive coloring: each channel driven by proximity to one SDF primitive
-                return saturate(1 - float3(GetDistToSphere(p), GetDistToTorus(p), GetDistToBox(p)));
-            }
-
             void frag(v2f i, out float4 color : SV_Target, out float depth : SV_Depth)
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+
+                if (_SdfNodeCount <= 0)
+                {
+                    color = 0;
+                    depth = 0;
+                    discard;
+                }
 
                 float3 ro = i.ro;
                 float3 rd = normalize(i.hitPos - ro);
@@ -354,7 +350,7 @@ Shader "RayMarchScene"
                 half3 normalWS = normalize(half3(GetNormal(p)));
 
                 SurfaceData surfaceData = (SurfaceData)0;
-                surfaceData.albedo     = half3(GetAlbedo(p));
+                surfaceData.albedo     = half3(1.0, 1.0, 1.0);
                 surfaceData.metallic   = (half)_Metallic;
                 surfaceData.smoothness = (half)_Smoothness;
                 surfaceData.occlusion  = 1.0h;

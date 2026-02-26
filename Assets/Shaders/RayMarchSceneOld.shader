@@ -102,7 +102,7 @@ Shader "RayMarchSceneOld"
                 return o;
             }
 
-            // https://www.iquilezles.org/www/articles/smin/smin.htm
+            // https://iquilezles.org/articles/smin/
 
             float SMinPoly(float a, float b, float k)
             {
