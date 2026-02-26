@@ -3,15 +3,18 @@ using UnityEngine;
 using Unity.Profiling;
 
 [InitializeOnLoad]
-public static class SceneViewPerformanceOverlay {
+public static class SceneViewPerformanceOverlay
+{
     const float UpdateInterval = 0.5f;
     const string PrefKey = "SceneViewPerfOverlay.Enabled";
     const string MenuPath = "Custom Tools/Performance Overlay";
 
     static bool _isEnabled = EditorPrefs.GetBool(PrefKey, true);
-    public static bool IsEnabled {
+    public static bool IsEnabled
+    {
         get => _isEnabled;
-        set {
+        set
+        {
             _isEnabled = value;
             EditorPrefs.SetBool(PrefKey, value);
             SceneView.RepaintAll();
@@ -40,7 +43,8 @@ public static class SceneViewPerformanceOverlay {
     static int boxWidth = 170;
 
 
-    static SceneViewPerformanceOverlay() {
+    static SceneViewPerformanceOverlay()
+    {
         gpuRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "GPU Frame Time");
         cpuRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Internal, "Main Thread");
 
@@ -48,7 +52,8 @@ public static class SceneViewPerformanceOverlay {
         EditorApplication.update += OnUpdate;
     }
 
-    static void OnUpdate() {
+    static void OnUpdate()
+    {
         double now = EditorApplication.timeSinceStartup;
         if (lastFrameTime > 0)
             sampleAccumFrameMs += (now - lastFrameTime) * 1000.0;
@@ -58,7 +63,8 @@ public static class SceneViewPerformanceOverlay {
         sampleAccumGpu += gpuRecorder.LastValue;
         sampleCount++;
 
-        if (now - lastUpdateTime >= UpdateInterval && sampleCount > 0) {
+        if (now - lastUpdateTime >= UpdateInterval && sampleCount > 0)
+        {
             displayCpuMs = (float)(sampleAccumCpu / sampleCount) / 1_000_000f;
             displayGpuMs = (float)(sampleAccumGpu / sampleCount) / 1_000_000f;
             float avgFrameMs = (float)(sampleAccumFrameMs / sampleCount);
@@ -72,7 +78,8 @@ public static class SceneViewPerformanceOverlay {
         }
     }
 
-    static void OnSceneGUI(SceneView sceneView) {
+    static void OnSceneGUI(SceneView sceneView)
+    {
         if (!IsEnabled) return;
 
         Handles.BeginGUI();
@@ -89,15 +96,12 @@ public static class SceneViewPerformanceOverlay {
         GUI.Label(new Rect(marginX + padding, marginY + padding + lineHeight, 155, 20), $"CPU: {displayCpuMs:F2} ms", style);
         GUI.Label(new Rect(marginX + padding, marginY + padding + 2 * lineHeight, 155, 20), $"GPU: {displayGpuMs:F2} ms", style);
 
-        if (extraLines > 0) {
-            float y = marginY + padding + 3 * lineHeight;
-            style.normal.textColor = new Color(1f, 0.9f, 0.5f);
-            var it = DebugStore.GetEnumerator();
-            while (it.MoveNext()) {
-                GUI.Label(new Rect(marginX + padding, y, boxWidth - 2 * padding, 20), $"{it.Current.Key}: {it.Current.Value}", style);
-                y += lineHeight;
-            }
-            it.Dispose();
+        float y = marginY + padding + 3 * lineHeight;
+        style.normal.textColor = new Color(1f, 0.9f, 0.5f);
+        foreach (var entry in DebugStore.Entries)
+        {
+            GUI.Label(new Rect(marginX + padding, y, boxWidth - 2 * padding, 20), $"{entry.Key}: {entry.Value}", style);
+            y += lineHeight;
         }
 
         Handles.EndGUI();
@@ -106,12 +110,14 @@ public static class SceneViewPerformanceOverlay {
     }
 
     [MenuItem(MenuPath)]
-    static void Toggle() {
+    static void Toggle()
+    {
         SceneViewPerformanceOverlay.IsEnabled = !SceneViewPerformanceOverlay.IsEnabled;
     }
 
     [MenuItem(MenuPath, validate = true)]
-    static bool ToggleValidate() {
+    static bool ToggleValidate()
+    {
         Menu.SetChecked(MenuPath, SceneViewPerformanceOverlay.IsEnabled);
         return true;
     }

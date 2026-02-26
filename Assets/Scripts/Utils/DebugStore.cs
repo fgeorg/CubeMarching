@@ -26,8 +26,7 @@ public static class DebugStore
     public static void Clear()                         => _entries.Clear();
     public static int Count                            => _entries.Count;
 
-    // Returns the live enumerator — only read on the main thread (editor GUI callbacks).
-    public static Dictionary<string, string>.Enumerator GetEnumerator() => _entries.GetEnumerator();
+    public static IEnumerable<KeyValuePair<string, string>> Entries     => _entries;
 }
 
 #else
