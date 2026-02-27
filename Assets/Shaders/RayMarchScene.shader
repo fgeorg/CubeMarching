@@ -3,13 +3,15 @@ Shader "RayMarchScene"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
+        _Tint ("Tint", Color) = (1, 1, 1, 1)
+        _Metallic ("Metallic", Range(0, 1)) = 0.0
+        _Smoothness ("Smoothness", Range(0, 1)) = 0.5
+
         [IntRange] _MaxSteps ("Max Steps", Range(1, 200)) = 50
         _MaxDist ("Max Dist", Range(1, 1000)) = 100
         _SurfDist ("Surf Dist", Range(0.00001, 0.1)) = 0.001
         _NormalDist ("Normal Dist", Range(0.00001, 0.1)) = 0.01
         _StepFactor ("Step Factor", Range(0.5, 1.0)) = 1.0
-        _Metallic ("Metallic", Range(0, 1)) = 0.0
-        _Smoothness ("Smoothness", Range(0, 1)) = 0.5
         [KeywordEnum(Disabled, Alpha, Discard)] _BackfaceCullMode ("Backface Cull Mode", Float) = 1
         _BackfaceCullMin ("Backface Cull Min", Range(0, 1.0)) = 0.1
         _BackfaceCullMax ("Backface Cull Max", Range(0, 1.0)) = 0.5
@@ -62,6 +64,7 @@ Shader "RayMarchScene"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
+                float4 _Tint;
                 float _MaxDist;
                 float _SurfDist;
                 float _NormalDist;
@@ -142,7 +145,7 @@ Shader "RayMarchScene"
                 half3 normalWS = normalize(half3(GetNormal(p)));
 
                 SurfaceData surfaceData = (SurfaceData)0;
-                surfaceData.albedo     = half3(1.0, 1.0, 1.0);
+                surfaceData.albedo     = half3(_Tint.rgb);
                 surfaceData.metallic   = (half)_Metallic;
                 surfaceData.smoothness = (half)_Smoothness;
                 surfaceData.occlusion  = 1.0h;
@@ -150,12 +153,13 @@ Shader "RayMarchScene"
                 surfaceData.normalTS   = half3(0, 0, 1);
 
                 col.rgb = SdfLighting(p, normalWS, clipSpacePos, surfaceData);
+                col.a = _Tint.a;
 
                 float ndotv = dot(normalWS, rd);
                 #if defined(_BACKFACECULLMODE_DISCARD)
                     if (ndotv > _BackfaceCullThreshold) discard;
                 #elif defined(_BACKFACECULLMODE_ALPHA)
-                    col.a = 1 - smoothstep(_BackfaceCullMin, _BackfaceCullMax, ndotv);
+                    col.a *= 1 - smoothstep(_BackfaceCullMin, _BackfaceCullMax, ndotv);
                 #endif
 
                 color = saturate(col);
