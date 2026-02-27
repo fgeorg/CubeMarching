@@ -3,24 +3,6 @@ using UnityEngine;
 [ExecuteInEditMode]
 public class SdfNodeComponent : MonoBehaviour
 {
-    // Integer values must match #define SDF_* in Assets/Shaders/SdfNodeTypes.hlsl.
-    // GPU-only smooth variants (11, 14, 15) are NOT in this enum; they are emitted
-    // by SdfScene.MakeOp when smoothK > 0 and declared as const int there.
-    public enum SdfNodeType
-    {
-        // ── Primitives (0–9) ─────────────────────────────────────────────────
-        Sphere = 0,
-        Box = 1,
-        Torus = 2,
-        // ── Binary operators (10–19) ─────────────────────────────────────────
-        Union = 10,
-        Intersect = 12,
-        Subtract = 13,
-        // ── Unary modifiers (20+) ─────────────────────────────────────────────
-        Shell = 20,  // abs(d) - thickness
-        Expand = 21, // d + amount  (negative = contract)
-    }
-
     public SdfNodeType nodeType = SdfNodeType.Union;
 
     private void OnEnable()  => GetComponentInParent<SdfScene>()?.MarkDirty();

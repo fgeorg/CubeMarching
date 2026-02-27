@@ -77,7 +77,7 @@ public class SdfScene : MonoBehaviour
 
     private void AppendPostfix(SdfNodeComponent node)
     {
-        if ((int)node.nodeType < 10)
+        if ((int)node.nodeType < SdfNodeTypeRanges.PrimitivesEnd)
         {
             _nodes.Add(MakePrimitive(node));
             _primitiveTransforms.Add(node.transform);
@@ -88,10 +88,10 @@ public class SdfScene : MonoBehaviour
                 SdfNodeComponent childNode = child.GetComponent<SdfNodeComponent>();
                 if (childNode == null) continue;
                 AppendPostfix(childNode);
-                _nodes.Add(MakeOp(SdfNodeComponent.SdfNodeType.Union, 0f));
+                _nodes.Add(MakeOp(SdfNodeType.Union, 0f));
             }
         }
-        else if ((int)node.nodeType >= 20) // unary modifier
+        else if ((int)node.nodeType >= SdfNodeTypeRanges.UnaryOpsStart) // unary modifier
         {
             // Union all children together first, then apply the modifier.
             bool first = true;
@@ -101,7 +101,7 @@ public class SdfScene : MonoBehaviour
                 SdfNodeComponent childNode = child.GetComponent<SdfNodeComponent>();
                 if (childNode == null) continue;
                 AppendPostfix(childNode);
-                if (!first) _nodes.Add(MakeOp(SdfNodeComponent.SdfNodeType.Union, 0f));
+                if (!first) _nodes.Add(MakeOp(SdfNodeType.Union, 0f));
                 first = false;
             }
             if (!first) // had at least one child
@@ -128,10 +128,10 @@ public class SdfScene : MonoBehaviour
         Vector4 p;
         switch (node.nodeType)
         {
-            case SdfNodeComponent.SdfNodeType.Sphere:
+            case SdfNodeType.Sphere:
                 p = new Vector4(0, node.sphereRadius, 0, 0);
                 break;
-            case SdfNodeComponent.SdfNodeType.Box:
+            case SdfNodeType.Box:
                 p = new Vector4(1, node.boxHalfExtents.x, node.boxHalfExtents.y, node.boxHalfExtents.z);
                 break;
             default: // Torus
@@ -143,7 +143,7 @@ public class SdfScene : MonoBehaviour
 
     private static BakedSdfNode MakeUnary(SdfNodeComponent node)
     {
-        float param = node.nodeType == SdfNodeComponent.SdfNodeType.Shell
+        float param = node.nodeType == SdfNodeType.Shell
             ? node.shellThickness
             : node.expandAmount;
         return new BakedSdfNode
@@ -159,16 +159,16 @@ public class SdfScene : MonoBehaviour
     private const int GpuSmoothIntersect = 14;
     private const int GpuSmoothSubtract = 15;
 
-    private static BakedSdfNode MakeOp(SdfNodeComponent.SdfNodeType type, float smoothK)
+    private static BakedSdfNode MakeOp(SdfNodeType type, float smoothK)
     {
         // Automatically pick smooth vs sharp variant based on k.
         bool smooth = smoothK > 0f;
         int gpuType;
         switch (type)
         {
-            case SdfNodeComponent.SdfNodeType.Union: gpuType = smooth ? GpuSmoothUnion : (int)type; break;
-            case SdfNodeComponent.SdfNodeType.Intersect: gpuType = smooth ? GpuSmoothIntersect : (int)type; break;
-            case SdfNodeComponent.SdfNodeType.Subtract: gpuType = smooth ? GpuSmoothSubtract : (int)type; break;
+            case SdfNodeType.Union: gpuType = smooth ? GpuSmoothUnion : (int)type; break;
+            case SdfNodeType.Intersect: gpuType = smooth ? GpuSmoothIntersect : (int)type; break;
+            case SdfNodeType.Subtract: gpuType = smooth ? GpuSmoothSubtract : (int)type; break;
             default: gpuType = (int)type; break;
         }
         return new BakedSdfNode

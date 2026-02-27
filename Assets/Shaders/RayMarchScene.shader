@@ -131,8 +131,7 @@ Shader "RayMarchScene"
                 float3 rd = normalize(i.hitPos - ro);
 
                 float d = RayMarch(ro, rd);
-                float4 col = 0;
-                col.a = 1;
+                float4 col;
 
                 if (d > _MaxDist)
                 {
@@ -163,6 +162,7 @@ Shader "RayMarchScene"
 #endif
 
                 color = saturate(col);
+                // convert to normalized device coordinates to get the depth    
                 depth = clipSpacePos.z / clipSpacePos.w;
             }
             ENDHLSL

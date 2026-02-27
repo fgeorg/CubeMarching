@@ -60,10 +60,9 @@ float GetDistanceToScene(float3 p)
         }
         else if (t <= SDF_UNARY_OPS_END && sp >= 2) // binary operator — pop two, push result
         {
-            sp--;
-            float b = GetStackValue(stack, sp);
-            sp--;
-            float a = GetStackValue(stack, sp);
+            float a = GetStackValue(stack, sp - 2);
+            float b = GetStackValue(stack, sp - 1);
+            sp -= 2;
             float r;
             if      (t == SDF_UNION)            r = min(a, b);
             else if (t == SDF_SMOOTH_UNION)     r = SmoothUnion(a, b, k);
