@@ -13,6 +13,12 @@ public class MeshGenerator : MonoBehaviour {
         MarchingCubes,
     }
 
+    protected readonly struct Cell {
+        public readonly int x, y, z;
+        public Cell(int x, int y, int z) { this.x = x; this.y = y; this.z = z; }
+        public Cell Offset(int dx, int dy, int dz) => new Cell(x + dx, y + dy, z + dz);
+    }
+
     [SerializeField] protected Bounds _bounds = new Bounds(Vector3.zero, Vector3.one);
     [SerializeField] protected EAlgorithm _algorithm = EAlgorithm.MarchingCubes;
     [Range(1, 50)][SerializeField] protected int _resolution = 1;
@@ -117,12 +123,13 @@ public class MeshGenerator : MonoBehaviour {
         for (int x = 0; x < _resolution && !earlyExit; x++) {
             for (int y = 0; y < _resolution && !earlyExit; y++) {
                 for (int z = 0; z < _resolution; z++) {
+                    var c = new Cell(x, y, z);
                     switch (_algorithm) {
                         case EAlgorithm.MarchingCubes:
-                            AddCube(_vertices, _triangles, x, y, z, cubeSize);
+                            AddCube(_vertices, _triangles, c, cubeSize);
                             break;
                         case EAlgorithm.Minecraft:
-                            AddVoxel(x, y, z, cubeSize);
+                            AddVoxel(c, cubeSize);
                             break;
                     }
                     float percentDone = (float)(x * _resolution * _resolution + y * _resolution + z)
@@ -172,10 +179,11 @@ public class MeshGenerator : MonoBehaviour {
         for (int x = 0; x < _resolution && !earlyExit; x++) {
             for (int y = 0; y < _resolution && !earlyExit; y++) {
                 for (int z = 0; z < _resolution; z++) {
+                    var c = new Cell(x, y, z);
                     if (_algorithm == EAlgorithm.MarchingCubes) {
-                        AddCubeWithEdgeDedup(x, y, z, cubeSize);
+                        AddCubeWithEdgeDedup(c, cubeSize);
                     } else {
-                        AddVoxelWithCornerDedup(x, y, z, cubeSize);
+                        AddVoxelWithCornerDedup(c, cubeSize);
                     }
                     float percentDone = (float)(x * _resolution * _resolution + y * _resolution + z)
                                       / (_resolution * _resolution * _resolution);
@@ -193,9 +201,9 @@ public class MeshGenerator : MonoBehaviour {
 
     // ─── Wireframe (non-dedup) cell generators ────────────────────────────────
 
-    protected void AddCube(List<Vector3> vertices, List<int> triangles, int xi, int yi, int zi, float cubeSize) {
-        int bits = GetCornerBits(xi, yi, zi, cubeSize);
-        var origin = PointAtIndices(xi, yi, zi, cubeSize);
+    protected void AddCube(List<Vector3> vertices, List<int> triangles, Cell c, float cubeSize) {
+        int bits = GetCornerBits(c, cubeSize);
+        var origin = PointAtCell(c, cubeSize);
         var cubeDim = (_bounds.max - _bounds.min) * cubeSize;
 
         var tris = MarchTables.triangulation[~bits & 255];
@@ -208,67 +216,64 @@ public class MeshGenerator : MonoBehaviour {
         }
     }
 
-    protected void AddVoxel(int xi, int yi, int zi, float cubeSize) {
-        if (GetDistance(CenterPointAtIndices(xi, yi, zi, cubeSize)) > 0) { return; }
+    protected void AddVoxel(Cell c, float cubeSize) {
+        if (GetDistanceToScene(CenterPointCell(c, cubeSize)) > 0) { return; }
 
         // Bottom face
-        if (GetDistance(CenterPointAtIndices(xi, yi - 1, zi, cubeSize)) > 0) {
-            AddQuad((xi, yi, zi),
-                    (xi + 1, yi, zi),
-                    (xi + 1, yi, zi + 1),
-                    (xi, yi, zi + 1),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(0, -1, 0), cubeSize)) > 0) {
+            AddQuad(c,
+                    c.Offset(1, 0, 0),
+                    c.Offset(1, 0, 1),
+                    c.Offset(0, 0, 1),
                     cubeSize);
         }
         // Top face
-        if (GetDistance(CenterPointAtIndices(xi, yi + 1, zi, cubeSize)) > 0) {
-            AddQuad((xi, yi + 1, zi),
-                    (xi, yi + 1, zi + 1),
-                    (xi + 1, yi + 1, zi + 1),
-                    (xi + 1, yi + 1, zi),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(0, 1, 0), cubeSize)) > 0) {
+            AddQuad(c.Offset(0, 1, 0),
+                    c.Offset(0, 1, 1),
+                    c.Offset(1, 1, 1),
+                    c.Offset(1, 1, 0),
                     cubeSize);
         }
         // Left face
-        if (GetDistance(CenterPointAtIndices(xi - 1, yi, zi, cubeSize)) > 0) {
-            AddQuad((xi, yi, zi),
-                    (xi, yi, zi + 1),
-                    (xi, yi + 1, zi + 1),
-                    (xi, yi + 1, zi),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(-1, 0, 0), cubeSize)) > 0) {
+            AddQuad(c,
+                    c.Offset(0, 0, 1),
+                    c.Offset(0, 1, 1),
+                    c.Offset(0, 1, 0),
                     cubeSize);
         }
         // Right face
-        if (GetDistance(CenterPointAtIndices(xi + 1, yi, zi, cubeSize)) > 0) {
-            AddQuad((xi + 1, yi, zi),
-                    (xi + 1, yi + 1, zi),
-                    (xi + 1, yi + 1, zi + 1),
-                    (xi + 1, yi, zi + 1),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(1, 0, 0), cubeSize)) > 0) {
+            AddQuad(c.Offset(1, 0, 0),
+                    c.Offset(1, 1, 0),
+                    c.Offset(1, 1, 1),
+                    c.Offset(1, 0, 1),
                     cubeSize);
         }
         // Front face
-        if (GetDistance(CenterPointAtIndices(xi, yi, zi - 1, cubeSize)) > 0) {
-            AddQuad((xi, yi, zi),
-                    (xi, yi + 1, zi),
-                    (xi + 1, yi + 1, zi),
-                    (xi + 1, yi, zi),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(0, 0, -1), cubeSize)) > 0) {
+            AddQuad(c,
+                    c.Offset(0, 1, 0),
+                    c.Offset(1, 1, 0),
+                    c.Offset(1, 0, 0),
                     cubeSize);
         }
         // Back face
-        if (GetDistance(CenterPointAtIndices(xi, yi, zi + 1, cubeSize)) > 0) {
-            AddQuad((xi, yi, zi + 1),
-                    (xi + 1, yi, zi + 1),
-                    (xi + 1, yi + 1, zi + 1),
-                    (xi, yi + 1, zi + 1),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(0, 0, 1), cubeSize)) > 0) {
+            AddQuad(c.Offset(0, 0, 1),
+                    c.Offset(1, 0, 1),
+                    c.Offset(1, 1, 1),
+                    c.Offset(0, 1, 1),
                     cubeSize);
         }
     }
 
-    protected void AddQuad(
-            (int x, int y, int z) a, (int x, int y, int z) b,
-            (int x, int y, int z) c, (int x, int y, int z) d,
-            float cubeSize) {
-        _vertices.Add(PointAtIndices(a.x, a.y, a.z, cubeSize));
-        _vertices.Add(PointAtIndices(b.x, b.y, b.z, cubeSize));
-        _vertices.Add(PointAtIndices(c.x, c.y, c.z, cubeSize));
-        _vertices.Add(PointAtIndices(d.x, d.y, d.z, cubeSize));
+    protected void AddQuad(Cell a, Cell b, Cell c, Cell d, float cubeSize) {
+        _vertices.Add(PointAtCell(a, cubeSize));
+        _vertices.Add(PointAtCell(b, cubeSize));
+        _vertices.Add(PointAtCell(c, cubeSize));
+        _vertices.Add(PointAtCell(d, cubeSize));
         AddQuadIndices(_triangles, _vertices.Count);
     }
 
@@ -283,25 +288,25 @@ public class MeshGenerator : MonoBehaviour {
 
     // ─── Dedup cell generators ────────────────────────────────────────────────
 
-    // Shared: compute the 8-corner sign bitmask for the cube at (xi, yi, zi).
-    private int GetCornerBits(int xi, int yi, int zi, float cubeSize) {
+    // Shared: compute the 8-corner sign bitmask for the cube at c.
+    private int GetCornerBits(Cell c, float cubeSize) {
         int bits =
-                GetDistance(PointAtIndices(xi + 0, yi + 0, zi + 1, cubeSize)) < 0 ? (1 << 0) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 1, yi + 0, zi + 1, cubeSize)) < 0 ? (1 << 1) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 1, yi + 0, zi + 0, cubeSize)) < 0 ? (1 << 2) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 0, yi + 0, zi + 0, cubeSize)) < 0 ? (1 << 3) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 0, yi + 1, zi + 1, cubeSize)) < 0 ? (1 << 4) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 1, yi + 1, zi + 1, cubeSize)) < 0 ? (1 << 5) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 1, yi + 1, zi + 0, cubeSize)) < 0 ? (1 << 6) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 0, yi + 1, zi + 0, cubeSize)) < 0 ? (1 << 7) : 0;
+                GetDistanceToScene(PointAtCell(c.Offset(0, 0, 1), cubeSize)) < 0 ? (1 << 0) : 0;
+        bits |= GetDistanceToScene(PointAtCell(c.Offset(1, 0, 1), cubeSize)) < 0 ? (1 << 1) : 0;
+        bits |= GetDistanceToScene(PointAtCell(c.Offset(1, 0, 0), cubeSize)) < 0 ? (1 << 2) : 0;
+        bits |= GetDistanceToScene(PointAtCell(c, cubeSize)) < 0 ? (1 << 3) : 0;
+        bits |= GetDistanceToScene(PointAtCell(c.Offset(0, 1, 1), cubeSize)) < 0 ? (1 << 4) : 0;
+        bits |= GetDistanceToScene(PointAtCell(c.Offset(1, 1, 1), cubeSize)) < 0 ? (1 << 5) : 0;
+        bits |= GetDistanceToScene(PointAtCell(c.Offset(1, 1, 0), cubeSize)) < 0 ? (1 << 6) : 0;
+        bits |= GetDistanceToScene(PointAtCell(c.Offset(0, 1, 0), cubeSize)) < 0 ? (1 << 7) : 0;
         return bits;
     }
 
     // Each triangle vertex lies on a cube edge; the EdgeKey uniquely identifies
     // that edge regardless of which adjacent cube visits it first.
-    private void AddCubeWithEdgeDedup(int xi, int yi, int zi, float cubeSize) {
-        int bits = GetCornerBits(xi, yi, zi, cubeSize);
-        var origin = PointAtIndices(xi, yi, zi, cubeSize);
+    private void AddCubeWithEdgeDedup(Cell c, float cubeSize) {
+        int bits = GetCornerBits(c, cubeSize);
+        var origin = PointAtCell(c, cubeSize);
         var cubeDim = (_bounds.max - _bounds.min) * cubeSize;
         int stride = _resolution + 1;
         int strideX = stride * stride;
@@ -315,8 +320,8 @@ public class MeshGenerator : MonoBehaviour {
             int dyB = MarchTables.edgeCorners[edgeIndex, 4];
             int dzB = MarchTables.edgeCorners[edgeIndex, 5];
 
-            int cornerA = (xi + dxA) * strideX + (yi + dyA) * stride + (zi + dzA);
-            int cornerB = (xi + dxB) * strideX + (yi + dyB) * stride + (zi + dzB);
+            int cornerA = (c.x + dxA) * strideX + (c.y + dyA) * stride + c.z + dzA;
+            int cornerB = (c.x + dxB) * strideX + (c.y + dyB) * stride + c.z + dzB;
             long key = EdgeKey(cornerA, cornerB);
 
             if (_edgeVertexCache.TryGetValue(key, out int idx)) {
@@ -339,101 +344,98 @@ public class MeshGenerator : MonoBehaviour {
         return ((long)lo << 32) | (uint)hi;
     }
 
-    // Keyed on integer grid coordinates (xi, yi, zi) — no float comparison, no ambiguity.
-    private void AddVoxelWithCornerDedup(int xi, int yi, int zi, float cubeSize) {
-        if (GetDistance(CenterPointAtIndices(xi, yi, zi, cubeSize)) > 0) { return; }
+    // Keyed on integer grid coordinates — no float comparison, no ambiguity.
+    private void AddVoxelWithCornerDedup(Cell c, float cubeSize) {
+        if (GetDistanceToScene(CenterPointCell(c, cubeSize)) > 0) { return; }
 
         // Bottom face
-        if (GetDistance(CenterPointAtIndices(xi, yi - 1, zi, cubeSize)) > 0) {
-            AddDedupedQuad((xi, yi, zi),
-                           (xi + 1, yi, zi),
-                           (xi + 1, yi, zi + 1),
-                           (xi, yi, zi + 1),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(0, -1, 0), cubeSize)) > 0) {
+            AddDedupedQuad(c,
+                           c.Offset(1, 0, 0),
+                           c.Offset(1, 0, 1),
+                           c.Offset(0, 0, 1),
                            cubeSize);
         }
         // Top face
-        if (GetDistance(CenterPointAtIndices(xi, yi + 1, zi, cubeSize)) > 0) {
-            AddDedupedQuad((xi, yi + 1, zi),
-                           (xi, yi + 1, zi + 1),
-                           (xi + 1, yi + 1, zi + 1),
-                           (xi + 1, yi + 1, zi),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(0, 1, 0), cubeSize)) > 0) {
+            AddDedupedQuad(c.Offset(0, 1, 0),
+                           c.Offset(0, 1, 1),
+                           c.Offset(1, 1, 1),
+                           c.Offset(1, 1, 0),
                            cubeSize);
         }
         // Left face
-        if (GetDistance(CenterPointAtIndices(xi - 1, yi, zi, cubeSize)) > 0) {
-            AddDedupedQuad((xi, yi, zi),
-                           (xi, yi, zi + 1),
-                           (xi, yi + 1, zi + 1),
-                           (xi, yi + 1, zi),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(-1, 0, 0), cubeSize)) > 0) {
+            AddDedupedQuad(c,
+                           c.Offset(0, 0, 1),
+                           c.Offset(0, 1, 1),
+                           c.Offset(0, 1, 0),
                            cubeSize);
         }
         // Right face
-        if (GetDistance(CenterPointAtIndices(xi + 1, yi, zi, cubeSize)) > 0) {
-            AddDedupedQuad((xi + 1, yi, zi),
-                           (xi + 1, yi + 1, zi),
-                           (xi + 1, yi + 1, zi + 1),
-                           (xi + 1, yi, zi + 1),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(1, 0, 0), cubeSize)) > 0) {
+            AddDedupedQuad(c.Offset(1, 0, 0),
+                           c.Offset(1, 1, 0),
+                           c.Offset(1, 1, 1),
+                           c.Offset(1, 0, 1),
                            cubeSize);
         }
         // Front face
-        if (GetDistance(CenterPointAtIndices(xi, yi, zi - 1, cubeSize)) > 0) {
-            AddDedupedQuad((xi, yi, zi),
-                           (xi, yi + 1, zi),
-                           (xi + 1, yi + 1, zi),
-                           (xi + 1, yi, zi),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(0, 0, -1), cubeSize)) > 0) {
+            AddDedupedQuad(c,
+                           c.Offset(0, 1, 0),
+                           c.Offset(1, 1, 0),
+                           c.Offset(1, 0, 0),
                            cubeSize);
         }
         // Back face
-        if (GetDistance(CenterPointAtIndices(xi, yi, zi + 1, cubeSize)) > 0) {
-            AddDedupedQuad((xi, yi, zi + 1),
-                           (xi + 1, yi, zi + 1),
-                           (xi + 1, yi + 1, zi + 1),
-                           (xi, yi + 1, zi + 1),
+        if (GetDistanceToScene(CenterPointCell(c.Offset(0, 0, 1), cubeSize)) > 0) {
+            AddDedupedQuad(c.Offset(0, 0, 1),
+                           c.Offset(1, 0, 1),
+                           c.Offset(1, 1, 1),
+                           c.Offset(0, 1, 1),
                            cubeSize);
         }
     }
 
-    private void AddDedupedQuad(
-            (int x, int y, int z) a, (int x, int y, int z) b,
-            (int x, int y, int z) c, (int x, int y, int z) d,
-            float cubeSize) {
-        int ia = GetOrAddVoxelCorner(a.x, a.y, a.z, cubeSize);
-        int ib = GetOrAddVoxelCorner(b.x, b.y, b.z, cubeSize);
-        int ic = GetOrAddVoxelCorner(c.x, c.y, c.z, cubeSize);
-        int id = GetOrAddVoxelCorner(d.x, d.y, d.z, cubeSize);
+    private void AddDedupedQuad(Cell a, Cell b, Cell c, Cell d, float cubeSize) {
+        int ia = GetOrAddVoxelCorner(a, cubeSize);
+        int ib = GetOrAddVoxelCorner(b, cubeSize);
+        int ic = GetOrAddVoxelCorner(c, cubeSize);
+        int id = GetOrAddVoxelCorner(d, cubeSize);
         _triangles.Add(ia); _triangles.Add(ib); _triangles.Add(ic);
         _triangles.Add(ia); _triangles.Add(ic); _triangles.Add(id);
     }
 
-    private int GetOrAddVoxelCorner(int xi, int yi, int zi, float cubeSize) {
-        long key = CornerKey(xi, yi, zi);
+    private int GetOrAddVoxelCorner(Cell c, float cubeSize) {
+        long key = CornerKey(c);
         if (_cornerVertexCache.TryGetValue(key, out int idx)) { return idx; }
         int newIdx = _vertices.Count;
         _cornerVertexCache[key] = newIdx;
-        _vertices.Add(PointAtIndices(xi, yi, zi, cubeSize));
+        _vertices.Add(PointAtCell(c, cubeSize));
         return newIdx;
     }
 
     // Packs integer grid coords into a single long. Resolution ≤ 50 means
     // coords ≤ 51, which fits comfortably in 21 bits per axis.
-    private static long CornerKey(int x, int y, int z) =>
-        ((long)x << 42) | ((long)y << 21) | (long)z;
+    private static long CornerKey(Cell c) =>
+        ((long)c.x << 42) | ((long)c.y << 21) | (long)c.z;
 
     // ─── Coordinate and mesh helpers ──────────────────────────────────────────
 
-    protected Vector3 PointAtIndices(int x, int y, int z, float cubeSize) {
+    protected Vector3 PointAtCell(Cell c, float cubeSize) {
         return new Vector3(
-            x * cubeSize * (_bounds.max.x - _bounds.min.x) + _bounds.min.x,
-            y * cubeSize * (_bounds.max.y - _bounds.min.y) + _bounds.min.y,
-            z * cubeSize * (_bounds.max.z - _bounds.min.z) + _bounds.min.z
+            c.x * cubeSize * (_bounds.max.x - _bounds.min.x) + _bounds.min.x,
+            c.y * cubeSize * (_bounds.max.y - _bounds.min.y) + _bounds.min.y,
+            c.z * cubeSize * (_bounds.max.z - _bounds.min.z) + _bounds.min.z
         );
     }
 
-    protected Vector3 CenterPointAtIndices(int x, int y, int z, float cubeSize) {
+    protected Vector3 CenterPointCell(Cell c, float cubeSize) {
         return new Vector3(
-            (x + 0.5f) * cubeSize * (_bounds.max.x - _bounds.min.x) + _bounds.min.x,
-            (y + 0.5f) * cubeSize * (_bounds.max.y - _bounds.min.y) + _bounds.min.y,
-            (z + 0.5f) * cubeSize * (_bounds.max.z - _bounds.min.z) + _bounds.min.z
+            (c.x + 0.5f) * cubeSize * (_bounds.max.x - _bounds.min.x) + _bounds.min.x,
+            (c.y + 0.5f) * cubeSize * (_bounds.max.y - _bounds.min.y) + _bounds.min.y,
+            (c.z + 0.5f) * cubeSize * (_bounds.max.z - _bounds.min.z) + _bounds.min.z
         );
     }
 
@@ -441,7 +443,7 @@ public class MeshGenerator : MonoBehaviour {
         for (int i = 0; i < _vertices.Count; i++) {
             for (int j = 0; j < _projectionSteps; j++) {
                 var n = GetNormal(_vertices[i]);
-                _vertices[i] -= n * GetDistance(_vertices[i]) * _projectionAmount;
+                _vertices[i] -= n * GetDistanceToScene(_vertices[i]) * _projectionAmount;
             }
         }
     }
@@ -460,16 +462,24 @@ public class MeshGenerator : MonoBehaviour {
 
     // ─── SDF evaluation ───────────────────────────────────────────────────────
 
-    protected float GetDistance(Vector3 p) {
+    protected float GetDistanceToScene(Vector3 p) {
         return _sdfScene.GetDistance(transform.TransformPoint(p));
     }
 
     protected Vector3 GetNormal(Vector3 p) {
         Vector3 n = new Vector3(
-            GetDistance(p + new Vector3(1e-2f, 0, 0)),
-            GetDistance(p + new Vector3(0, 1e-2f, 0)),
-            GetDistance(p + new Vector3(0, 0, 1e-2f))
-        ) - GetDistance(p) * Vector3.one;
+            GetDistanceToScene(p + new Vector3(1e-2f, 0, 0)),
+            GetDistanceToScene(p + new Vector3(0, 1e-2f, 0)),
+            GetDistanceToScene(p + new Vector3(0, 0, 1e-2f))
+        ) - GetDistanceToScene(p) * Vector3.one;
         return n.normalized;
+    }
+
+    protected float SMinCubic(float a, float b, float k) {
+        if (k <= 0) {
+            return Math.Min(a, b);
+        }
+        float h = Math.Max(k - Math.Abs(a - b), 0.0f) / k;
+        return Math.Min(a, b) - h * h * h * k * (1.0f / 6.0f);
     }
 }

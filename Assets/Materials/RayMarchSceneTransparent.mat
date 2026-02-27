@@ -13,6 +13,7 @@ Material:
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _BACKFACECULLMODE_ALPHA
+  - _PRIMITIVEALBEDOMODE_DISABLED
   m_InvalidKeywords:
   - _MARCHMODE_SIMPLE
   m_LightmapFlags: 4
@@ -111,6 +112,7 @@ Material:
     - _Omega: 1.3
     - _OvershootEps: 0.1
     - _Parallax: 0.005
+    - _PrimitiveAlbedoMode: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
     - _SMinKValue: 0.48
