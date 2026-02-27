@@ -29,6 +29,7 @@ public class MeshGenerator : MonoBehaviour {
     [SerializeField] protected MeshFilter _dedupedMeshFilter = null;
 
     protected bool _shouldRegenerate = true;
+    private TransformTracker _selfTracker;
 
     // Scratch buffers reused each regeneration
     private List<Vector3> _vertices = new List<Vector3>();
@@ -50,9 +51,13 @@ public class MeshGenerator : MonoBehaviour {
 
     protected void OnEnable() {
         if (_sdfScene != null) _sdfScene.Rebuilt += MarkDirty;
+        _selfTracker = new TransformTracker(transform);
+        MarkDirty();
     }
 
     protected void OnDisable() {
+        if (_fullMesh != null) _fullMesh.Clear();
+        if (_dedupedMesh != null) _dedupedMesh.Clear();
         if (_sdfScene != null) _sdfScene.Rebuilt -= MarkDirty;
     }
 
@@ -61,6 +66,7 @@ public class MeshGenerator : MonoBehaviour {
     }
 
     protected void Update() {
+        if (_selfTracker.HasChanged()) _shouldRegenerate = true;
         if (_shouldRegenerate) {
             Regenerate();
         }

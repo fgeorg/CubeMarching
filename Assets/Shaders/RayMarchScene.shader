@@ -41,8 +41,6 @@ Shader "RayMarchScene"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "SdfLighting.hlsl"
-            #include "SdfNodeTypes.hlsl"
-            #include "SdfStack.hlsl"
 
             struct appdata
             {
@@ -77,12 +75,7 @@ Shader "RayMarchScene"
                 int _SdfNodeCount;
             CBUFFER_END
 
-            struct SdfNode
-            {
-                float4 typeAndParams; // x=type, y=param0, z=param1, w=param2
-                float4x4 transform;
-            };
-            StructuredBuffer<SdfNode> _SdfNodes;
+            #include "SdfSceneDistanceGpu.hlsl"
 
             v2f vert(appdata v)
             {
@@ -95,94 +88,14 @@ Shader "RayMarchScene"
                 return o;
             }
 
-            // Smooth boolean ops — https://iquilezles.org/articles/smin/
-            float SmoothUnion(float a, float b, float k)
-            {
-                float h = max(k - abs(a - b), 0.0);
-                return min(a, b) - h * h * 0.25 / k;
-            }
-
-            float SmoothSubtract(float a, float b, float k)  { 
-                return -SmoothUnion(-a, b, k); 
-            }
-
-            float SmoothIntersect(float a, float b, float k)  { 
-                return -SmoothUnion(-a, -b, k); 
-            }
-
-
-            // Postfix stack evaluator. Primitives push; binary ops pop two and push result;
-            // unary ops modify top in place.
-            float EvalScene(float3 p)
-            {
-                SdfStack stack = (SdfStack)0;
-                int sp = 0;
-                [loop]
-                for (int i = 0; i < _SdfNodeCount; i++)
-                {
-                    SdfNode node = _SdfNodes[i];
-                    int t = (int)node.typeAndParams.x;
-                    float k = node.typeAndParams.y;
-                    if (t < SDF_UNION) // primitive — push
-                    {
-                        float3 lp = mul(node.transform, float4(p, 1.0)).xyz;
-                        float d;
-                        if (t == SDF_SPHERE)
-                        d = length(lp) - node.typeAndParams.y;
-                        else if (t == SDF_BOX)
-                        {
-                            float3 bh = node.typeAndParams.yzw;
-                            float3 q = abs(lp) - bh;
-                            d = length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
-                        }
-                        else // SDF_TORUS
-                        {
-                            float2 q2 = float2(length(lp.xy) - node.typeAndParams.y, lp.z);
-                            d = length(q2) - node.typeAndParams.z;
-                        }
-                        if (sp < STACK_SIZE)
-                        {
-                            SetStackValue(stack, sp, d);
-                            sp++;
-                        }
-                    }
-                    else if (t >= SDF_SHELL) // unary modifier — modify top in place
-                    {
-                        if (sp >= 1)
-                        {
-                            float top = GetStackValue(stack, sp - 1);
-                            if (t == SDF_SHELL) SetStackValue(stack, sp - 1, abs(top) - k);
-                            else                SetStackValue(stack, sp - 1, top - k); // SDF_EXPAND
-                        }
-                    }
-                    else if (sp >= 2) // binary operator — pop two, push result
-                    {
-                        sp--;
-                        float b = GetStackValue(stack, sp);
-                        sp--;
-                        float a = GetStackValue(stack, sp);
-                        float r;
-                        if      (t == SDF_UNION)            r = min(a, b);
-                        else if (t == SDF_SMOOTH_UNION)     r = SmoothUnion(a, b, k);
-                        else if (t == SDF_INTERSECT)        r = max(a, b);
-                        else if (t == SDF_SMOOTH_INTERSECT) r = SmoothIntersect(a, b, k);
-                        else if (t == SDF_SUBTRACT)         r = max(a, -b);
-                        else                                r = SmoothSubtract(a, b, k); // SDF_SMOOTH_SUBTRACT
-                        SetStackValue(stack, sp, r);
-                        sp++;
-                    }
-                }
-                return sp > 0 ? GetStackValue(stack, 0) : 1e10;
-            }
-
             float3 GetNormal(float3 p)
             {
                 float2 e = float2(_NormalDist, 0);
                 float3 n = float3(
-                EvalScene(p + e.xyy),
-                EvalScene(p + e.yxy),
-                EvalScene(p + e.yyx)
-                ) - EvalScene(p);
+                GetDistanceToScene(p + e.xyy),
+                GetDistanceToScene(p + e.yxy),
+                GetDistanceToScene(p + e.yyx)
+                ) - GetDistanceToScene(p);
                 return normalize(n);
             }
 
@@ -193,7 +106,7 @@ Shader "RayMarchScene"
                 for (int i = 0; i < _MaxSteps; i++)
                 {
                     float3 p = ro + dO * rd;
-                    float dS = EvalScene(p);
+                    float dS = GetDistanceToScene(p);
                     if (dS < _SurfDist || dO > _MaxDist) break;
                     dO += dS * _StepFactor;
                 }

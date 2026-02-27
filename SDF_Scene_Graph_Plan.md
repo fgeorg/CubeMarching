@@ -148,5 +148,5 @@ Stack trace:
 
 ## Remaining Tasks
 
-- [ ] Consolidate mesh gen: replace `CombinedDistanceField` reference in `MeshGenerator` with `SdfScene.GetDistance` so both the raymarcher and marching-cubes mesh share the same scene graph
+- [x] Consolidate mesh gen: replace `CombinedDistanceField` reference in `MeshGenerator` with `SdfScene.GetDistance` so both the raymarcher and marching-cubes mesh share the same scene graph
 - [ ] `RayMarchMaterialEditor.cs` — add `Draw("_Color")` line in the SDF section
