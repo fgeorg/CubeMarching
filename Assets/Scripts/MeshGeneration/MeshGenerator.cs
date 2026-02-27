@@ -472,12 +472,4 @@ public class MeshGenerator : MonoBehaviour {
         ) - GetDistance(p) * Vector3.one;
         return n.normalized;
     }
-
-    protected float SMinCubic(float a, float b, float k) {
-        if (k <= 0) {
-            return Math.Min(a, b);
-        }
-        float h = Math.Max(k - Math.Abs(a - b), 0.0f) / k;
-        return Math.Min(a, b) - h * h * h * k * (1.0f / 6.0f);
-    }
 }
