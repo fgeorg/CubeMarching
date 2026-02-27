@@ -16,21 +16,16 @@ public static class SdfSceneDistanceCpu {
 
             if ((int)t < SdfNodeTypeRanges.PrimitivesEnd) {
                 // primitive → push
-
                 Vector3 lp = node.transform.MultiplyPoint3x4(p);
                 switch (t) {
                     case SdfNodeType.Sphere:
-                        d = lp.magnitude - k;
+                        d = SdfSphere(lp, node.typeAndParams.y);
                         break;
                     case SdfNodeType.Box:
-                        Vector3 bh = new Vector3(node.typeAndParams.y, node.typeAndParams.z, node.typeAndParams.w);
-                        Vector3 q = new Vector3(Mathf.Abs(lp.x) - bh.x, Mathf.Abs(lp.y) - bh.y, Mathf.Abs(lp.z) - bh.z);
-                        d = Vector3.Max(q, Vector3.zero).magnitude
-                            + Mathf.Min(Mathf.Max(q.x, Mathf.Max(q.y, q.z)), 0f);
+                        d = SdfBox(lp, new Vector3(node.typeAndParams.y, node.typeAndParams.z, node.typeAndParams.w));
                         break;
                     case SdfNodeType.Torus:
-                        float ring = new Vector2(lp.x, lp.y).magnitude - node.typeAndParams.y;
-                        d = new Vector2(ring, lp.z).magnitude - node.typeAndParams.z;
+                        d = SdfTorus(lp, node.typeAndParams.y, node.typeAndParams.z);
                         break;
                 }
                 if (sp < stack.Length) {
@@ -38,7 +33,6 @@ public static class SdfSceneDistanceCpu {
                 }
             } else if ((int)t <= SdfNodeTypeRanges.UnaryOpsEnd && sp >= 2) {
                 // binary op → pop two, push result
-
                 float b = stack[--sp];
                 float a = stack[--sp];
                 switch (t) {
@@ -55,16 +49,15 @@ public static class SdfSceneDistanceCpu {
                         d = Mathf.Max(a, -b);
                         break;
                     case SdfNodeType.SmoothIntersect:
-                        d = -SmoothUnion(-a, -b, k);
+                        d = SmoothIntersect(a, b, k);
                         break;
                     case SdfNodeType.SmoothSubtract:
-                        d = -SmoothUnion(-a, b, k);
+                        d = SmoothSubtract(a, b, k);
                         break;
                 }
                 stack[sp++] = d;
             } else if ((int)t <= SdfNodeTypeRanges.UnaryOpsEnd && sp >= 1) {
                 // unary modifier → modify top in place
-
                 switch (t) {
                     case SdfNodeType.Shell:
                         stack[sp - 1] = Mathf.Abs(stack[sp - 1]) - k;
@@ -79,9 +72,32 @@ public static class SdfSceneDistanceCpu {
         return sp > 0 ? stack[0] : 1e10f;
     }
 
-    // Quadratic smooth-min — matches SmoothUnion() in SdfSceneDistanceGpu.hlsl.
+    // Primitive SDFs — mirrors SdfSceneDistanceGpu.hlsl.
+    private static float SdfSphere(Vector3 p, float r) {
+        return p.magnitude - r;
+    }
+
+    private static float SdfBox(Vector3 p, Vector3 halfExtents) {
+        Vector3 q = new Vector3(Mathf.Abs(p.x) - halfExtents.x, Mathf.Abs(p.y) - halfExtents.y, Mathf.Abs(p.z) - halfExtents.z);
+        return Vector3.Max(q, Vector3.zero).magnitude + Mathf.Min(Mathf.Max(q.x, Mathf.Max(q.y, q.z)), 0f);
+    }
+
+    private static float SdfTorus(Vector3 p, float ringRadius, float tubeRadius) {
+        float ring = new Vector2(p.x, p.y).magnitude - ringRadius;
+        return new Vector2(ring, p.z).magnitude - tubeRadius;
+    }
+
+    // Smooth boolean ops — https://iquilezles.org/articles/smin/
     private static float SmoothUnion(float a, float b, float k) {
         float h = Mathf.Max(k - Mathf.Abs(a - b), 0f);
         return Mathf.Min(a, b) - h * h * 0.25f / k;
+    }
+
+    private static float SmoothSubtract(float a, float b, float k) {
+        return -SmoothUnion(-a, b, k);
+    }
+
+    private static float SmoothIntersect(float a, float b, float k) {
+        return -SmoothUnion(-a, -b, k);
     }
 }

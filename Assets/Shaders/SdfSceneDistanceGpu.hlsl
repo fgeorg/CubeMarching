@@ -5,10 +5,27 @@
 #include "SdfStack.hlsl"
 
 struct SdfNode {
-    float4 typeAndParams; // x=type, y=param0, z=param1, w=param2
+    // x=type, y=param0, z=param1, w=param2
+    float4 typeAndParams;
+    // worldToLocal transform matrix
     float4x4 transform;
 };
 StructuredBuffer<SdfNode> _SdfNodes;
+
+// Primitive SDFs — https://iquilezles.org/articles/distfunctions/
+float SdfSphere(float3 p, float r) {
+    return length(p) - r;
+}
+
+float SdfBox(float3 p, float3 halfExtents) {
+    float3 q = abs(p) - halfExtents;
+    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
+float SdfTorus(float3 p, float ringRadius, float tubeRadius) {
+    float2 q = float2(length(p.xy) - ringRadius, p.z);
+    return length(q) - tubeRadius;
+}
 
 // Smooth boolean ops — https://iquilezles.org/articles/smin/
 float SmoothUnion(float a, float b, float k) {
@@ -36,19 +53,17 @@ float GetDistanceToScene(float3 p) {
         int t = (int)node.typeAndParams.x;
         float k = node.typeAndParams.y;
         if (t < SDF_PRIMITIVES_END) { // primitive — push
+            // convert to local space before evaluating the distance function
             float3 lp = mul(node.transform, float4(p, 1.0)).xyz;
             float d;
             if (t == SDF_SPHERE) {
-                d = length(lp) - node.typeAndParams.y;
+                d = SdfSphere(lp, node.typeAndParams.y);
             }
             else if (t == SDF_BOX) {
-                float3 bh = node.typeAndParams.yzw;
-                float3 q = abs(lp) - bh;
-                d = length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+                d = SdfBox(lp, node.typeAndParams.yzw);
             }
             else { // SDF_TORUS
-                float2 q2 = float2(length(lp.xy) - node.typeAndParams.y, lp.z);
-                d = length(q2) - node.typeAndParams.z;
+                d = SdfTorus(lp, node.typeAndParams.y, node.typeAndParams.z);
             }
             if (sp < STACK_SIZE) {
                 SetStackValue(stack, sp, d);
