@@ -20,7 +20,7 @@ public class MeshGenerator : MonoBehaviour {
 
     [SerializeField][Range(0, 1)] protected float _cubeMarchStepsToShow = 1;
 
-    [SerializeField] protected CombinedDistanceField _distanceField = null;
+    [SerializeField] protected SdfScene _sdfScene = null;
 
     // Assign child GameObjects' MeshFilters here. Either or both may be set.
     // WireframeMesh: sequential index buffer, for use with the wireframe shader.
@@ -46,6 +46,14 @@ public class MeshGenerator : MonoBehaviour {
 
     public void MarkDirty() {
         _shouldRegenerate = true;
+    }
+
+    protected void OnEnable() {
+        if (_sdfScene != null) _sdfScene.Rebuilt += MarkDirty;
+    }
+
+    protected void OnDisable() {
+        if (_sdfScene != null) _sdfScene.Rebuilt -= MarkDirty;
     }
 
     protected void OnValidate() {
@@ -343,7 +351,7 @@ public class MeshGenerator : MonoBehaviour {
         ((long)x << 42) | ((long)y << 21) | (long)z;
 
     protected float GetDistance(Vector3 p) {
-        return _distanceField.GetDistance(transform.TransformPoint(p));
+        return _sdfScene.GetDistance(transform.TransformPoint(p));
     }
 
     protected Vector3 GetNormal(Vector3 p) {

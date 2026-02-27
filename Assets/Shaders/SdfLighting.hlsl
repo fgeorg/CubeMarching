@@ -4,7 +4,7 @@
 // Shared PBR lighting for SDF/ray-march shaders (no shadow map — SDF geometry
 // is invisible to the shadow caster pass so shadow coords are zeroed out).
 // Must be included after Lighting.hlsl.
-half3 SDFLighting(float3 positionWS, half3 normalWS, float4 positionCS, SurfaceData surfaceData)
+half3 SdfLighting(float3 positionWS, half3 normalWS, float4 positionCS, SurfaceData surfaceData)
 {
     InputData inputData = (InputData)0;
     inputData.positionWS              = positionWS;

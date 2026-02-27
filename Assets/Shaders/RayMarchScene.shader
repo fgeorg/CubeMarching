@@ -40,7 +40,7 @@ Shader "RayMarchScene"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-            #include "SDFLighting.hlsl"
+            #include "SdfLighting.hlsl"
             #include "SdfNodeTypes.hlsl"
             #include "SdfStack.hlsl"
 
@@ -236,7 +236,7 @@ Shader "RayMarchScene"
                 surfaceData.alpha      = 1.0h;
                 surfaceData.normalTS   = half3(0, 0, 1);
 
-                col.rgb = SDFLighting(p, normalWS, clipSpacePos, surfaceData);
+                col.rgb = SdfLighting(p, normalWS, clipSpacePos, surfaceData);
 
                 float ndotv = dot(normalWS, rd);
                 #if defined(_BACKFACECULLMODE_DISCARD)
