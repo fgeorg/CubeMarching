@@ -280,7 +280,7 @@ public static class MarchTables {
 
     // For each of the 12 edges: { cornerA_dx, cornerA_dy, cornerA_dz, cornerB_dx, cornerB_dy, cornerB_dz }
     // Midpoint of each entry matches the corresponding edgePoints[i] entry.
-    public static readonly int[,] edgeCornerOffsets = {
+    public static readonly int[,] edgeCorners = {
         { 0,0,1,  1,0,1 },  // edge  0 → midpoint (0.5, 0.0, 1.0)
         { 1,0,1,  1,0,0 },  // edge  1 → midpoint (1.0, 0.0, 0.5)
         { 1,0,0,  0,0,0 },  // edge  2 → midpoint (0.5, 0.0, 0.0)

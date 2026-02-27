@@ -308,12 +308,12 @@ public class MeshGenerator : MonoBehaviour {
 
         var tris = MarchTables.triangulation[~bits & 255];
         foreach (var edgeIndex in tris) {
-            int dxA = MarchTables.edgeCornerOffsets[edgeIndex, 0];
-            int dyA = MarchTables.edgeCornerOffsets[edgeIndex, 1];
-            int dzA = MarchTables.edgeCornerOffsets[edgeIndex, 2];
-            int dxB = MarchTables.edgeCornerOffsets[edgeIndex, 3];
-            int dyB = MarchTables.edgeCornerOffsets[edgeIndex, 4];
-            int dzB = MarchTables.edgeCornerOffsets[edgeIndex, 5];
+            int dxA = MarchTables.edgeCorners[edgeIndex, 0];
+            int dyA = MarchTables.edgeCorners[edgeIndex, 1];
+            int dzA = MarchTables.edgeCorners[edgeIndex, 2];
+            int dxB = MarchTables.edgeCorners[edgeIndex, 3];
+            int dyB = MarchTables.edgeCorners[edgeIndex, 4];
+            int dzB = MarchTables.edgeCorners[edgeIndex, 5];
 
             int cornerA = (xi + dxA) * strideX + (yi + dyA) * stride + (zi + dzA);
             int cornerB = (xi + dxB) * strideX + (yi + dyB) * stride + (zi + dzB);
