@@ -166,6 +166,7 @@ GameObject:
   m_Component:
   - component: {fileID: 98876506}
   - component: {fileID: 98876505}
+  - component: {fileID: 98876507}
   m_Layer: 0
   m_Name: SdfScene
   m_TagString: Untagged
@@ -185,7 +186,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e9d73ee2ea32d4eeabf356f0abe0ead6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SdfScene
-  _SdfWindow: {fileID: 5038652750243243538}
 --- !u!4 &98876506
 Transform:
   m_ObjectHideFlags: 0
@@ -202,6 +202,26 @@ Transform:
   - {fileID: 313376744}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &98876507
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 98876504}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
+  nodeType: 10
+  sphereRadius: 0.5
+  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
+  torusMajorRadius: 0.4
+  torusMinorRadius: 0.15
+  smoothK: 0
+  shellThickness: 0.05
+  expandAmount: 0.01
 --- !u!1 &273160523
 GameObject:
   m_ObjectHideFlags: 0
@@ -625,7 +645,7 @@ Transform:
   m_GameObject: {fileID: 1142178999}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.566, y: 1.418, z: 0}
+  m_LocalPosition: {x: -0.674, y: 1.384, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2707,6 +2727,7 @@ GameObject:
   - component: {fileID: 4276955666017760553}
   - component: {fileID: 1409032778547661923}
   - component: {fileID: 2497344922925148407}
+  - component: {fileID: 5038652750243243539}
   m_Layer: 0
   m_Name: InvertedCube Window
   m_TagString: Untagged
@@ -2714,6 +2735,19 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &5038652750243243539
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5038652750243243538}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c74af1b35fda4b4bb628e807b323b59, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SdfRayMarchRenderer
+  _sdfScene: {fileID: 98876505}
 --- !u!23 &5059788001983007760
 MeshRenderer:
   m_ObjectHideFlags: 0

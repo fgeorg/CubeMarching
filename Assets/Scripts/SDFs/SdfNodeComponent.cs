@@ -21,7 +21,7 @@ public class SdfNodeComponent : MonoBehaviour
         Expand = 21, // d + amount  (negative = contract)
     }
 
-    public SdfNodeType nodeType = SdfNodeType.Sphere;
+    public SdfNodeType nodeType = SdfNodeType.Union;
 
     private void OnEnable()  => GetComponentInParent<SdfScene>()?.MarkDirty();
     private void OnDisable() => GetComponentInParent<SdfScene>()?.MarkDirty();

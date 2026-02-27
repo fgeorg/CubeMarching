@@ -4,38 +4,35 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 
 [ExecuteInEditMode]
+[RequireComponent(typeof(SdfNodeComponent))]
 public class SdfScene : MonoBehaviour
 {
     [StructLayout(LayoutKind.Sequential)]
-    private struct GpuSdfNode
+    public struct GpuSdfNode
     {
         public Vector4 typeAndParams; // x=type, y=param0, z=param1, w=param2
         public Matrix4x4 transform; // worldToLocalMatrix for primitives; identity for ops
     }
 
-    [Tooltip("the static \"window\" into our sdf with the RayMarchScene material on it")]
-    [SerializeField] private GameObject _SdfWindow;
-    private Renderer _renderer;
-    private MaterialPropertyBlock _propertyBlock;
-    private GraphicsBuffer _buffer;
+    private SdfNodeComponent _rootNode;
     private readonly List<GpuSdfNode> _nodes = new List<GpuSdfNode>();
+    private readonly List<Transform> _primitiveTransforms = new List<Transform>();
     private bool _hierarchyDirty;
     private TransformTracker[] _trackers = Array.Empty<TransformTracker>();
-    // Fired after the GPU buffer and CPU node list are fully updated.
+    // Fired after the node list is fully updated. Subscribers (e.g.
+    // SdfRayMarchRenderer) build their own GPU buffers from Nodes.
     public event Action Rebuilt;
+    public List<GpuSdfNode> Nodes => _nodes;
 
     private void OnEnable()
     {
-        _renderer = _SdfWindow.GetComponent<Renderer>();
-        _propertyBlock = new MaterialPropertyBlock();
+        _rootNode = GetComponent<SdfNodeComponent>();
         _hierarchyDirty = true;
-        RebuildBuffer();
+        RebuildPostfix();
     }
 
     private void OnDisable()
     {
-        _buffer?.Release();
-        _buffer = null;
         _trackers = Array.Empty<TransformTracker>();
     }
 
@@ -58,63 +55,32 @@ public class SdfScene : MonoBehaviour
                 if (_trackers[i].HasChanged()) { dirty = true; break; }
         }
         if (dirty) {
-            RebuildBuffer();
+            RebuildPostfix();
         }
     }
 
-    private void RebuildBuffer()
+    private void RebuildPostfix()
     {
-        if (_renderer == null) return;
-     
         _hierarchyDirty = false;
-
         _nodes.Clear();
-        var primitiveTransforms = new List<Transform>();
-        bool first = true;
+        _primitiveTransforms.Clear();
 
-        foreach (Transform child in transform)
-        {
-            if (!child.gameObject.activeInHierarchy) continue;
-            SdfNodeComponent node = child.GetComponent<SdfNodeComponent>();
-            if (node == null) continue;
-            TraversePostOrder(node, _nodes, primitiveTransforms);
-            // interleave: emit a union after each child past the first → depth stays at 2
-            if (!first) _nodes.Add(MakeOp(SdfNodeComponent.SdfNodeType.Union, 0f));
-            first = false;
-        }
-
-        int count = _nodes.Count;
-
-        // Metal requires the buffer to always be bound, even when count is 0.
-        // Allocate a minimum 1-element buffer and use _SdfNodeCount to gate the loop.
-        int bufferSize = Mathf.Max(count, 1);
-        if (_buffer == null || _buffer.count != bufferSize)
-        {
-            _buffer?.Release();
-            _buffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, bufferSize, 80);
-        }
-
-        if (count > 0)
-            _buffer.SetData(_nodes);
-
-        _propertyBlock.SetBuffer("_SdfNodes", _buffer);
-        _propertyBlock.SetInteger("_SdfNodeCount", count);
-        _renderer.SetPropertyBlock(_propertyBlock);
+        AppendPostfix(_rootNode);
 
         // Rebuild transform trackers from all primitive nodes found during traversal
-        _trackers = new TransformTracker[primitiveTransforms.Count];
-        for (int i = 0; i < primitiveTransforms.Count; i++)
-            _trackers[i] = new TransformTracker(primitiveTransforms[i]);
+        _trackers = new TransformTracker[_primitiveTransforms.Count];
+        for (int i = 0; i < _primitiveTransforms.Count; i++)
+            _trackers[i] = new TransformTracker(_primitiveTransforms[i]);
 
         Rebuilt?.Invoke();
     }
 
-    private void TraversePostOrder(SdfNodeComponent node, List<GpuSdfNode> list, List<Transform> primitiveTransforms)
+    private void AppendPostfix(SdfNodeComponent node)
     {
         if ((int)node.nodeType < 10)
         {
-            list.Add(MakePrimitive(node));
-            primitiveTransforms.Add(node.transform);
+            _nodes.Add(MakePrimitive(node));
+            _primitiveTransforms.Add(node.transform);
         }
         else if ((int)node.nodeType >= 20) // unary modifier
         {
@@ -125,12 +91,12 @@ public class SdfScene : MonoBehaviour
                 if (!child.gameObject.activeInHierarchy) continue;
                 SdfNodeComponent childNode = child.GetComponent<SdfNodeComponent>();
                 if (childNode == null) continue;
-                TraversePostOrder(childNode, list, primitiveTransforms);
-                if (!first) list.Add(MakeOp(SdfNodeComponent.SdfNodeType.Union, 0f));
+                AppendPostfix(childNode);
+                if (!first) _nodes.Add(MakeOp(SdfNodeComponent.SdfNodeType.Union, 0f));
                 first = false;
             }
             if (!first) // had at least one child
-                list.Add(MakeUnary(node));
+                _nodes.Add(MakeUnary(node));
         }
         else
         {
@@ -141,8 +107,8 @@ public class SdfScene : MonoBehaviour
                 if (!child.gameObject.activeInHierarchy) continue;
                 SdfNodeComponent childNode = child.GetComponent<SdfNodeComponent>();
                 if (childNode == null) continue;
-                TraversePostOrder(childNode, list, primitiveTransforms);
-                if (!first) list.Add(MakeOp(node.nodeType, node.smoothK));
+                AppendPostfix(childNode);
+                if (!first) _nodes.Add(MakeOp(node.nodeType, node.smoothK));
                 first = false;
             }
         }

@@ -17,8 +17,11 @@ public class SdfNodeComponentEditor : Editor
         {
             serializedObject.ApplyModifiedProperties();
             var node = (SdfNodeComponent)target;
-            Undo.RecordObject(node.gameObject, "Rename SDF Node");
-            node.gameObject.name = NodeTypeName(node.nodeType);
+            if (node.GetComponent<SdfScene>() == null)
+            {
+                Undo.RecordObject(node.gameObject, "Rename SDF Node");
+                node.gameObject.name = NodeTypeName(node.nodeType);
+            }
         }
 
         var current = (SdfNodeComponent)target;
