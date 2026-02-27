@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 [ExecuteInEditMode]
 public class MeshGenerator : MonoBehaviour {
     public enum EAlgorithm {
-        Voxels,
+        Minecraft,
         MarchingCubes,
     }
 
@@ -90,7 +90,7 @@ public class MeshGenerator : MonoBehaviour {
                         case EAlgorithm.MarchingCubes:
                             AddCube(_vertices, _triangles, x, y, z, cubeSize);
                             break;
-                        case EAlgorithm.Voxels:
+                        case EAlgorithm.Minecraft:
                             AddVoxel(_vertices, _triangles, x, y, z, cubeSize);
                             break;
                     }

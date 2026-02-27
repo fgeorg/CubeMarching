@@ -33,7 +33,7 @@ public class SdfNodeComponent : MonoBehaviour
     public float torusMinorRadius = 0.15f;
     [Range(0f, 1f)]
     public float smoothK = 0.0f;
-    [Range(0f, 0.2f)]
+    [Range(1e-5f, 0.2f)]
     public float shellThickness = 0.05f;
     [Range(-0.1f, 0.1f)]
     public float expandAmount = 0.01f;

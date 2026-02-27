@@ -101,12 +101,18 @@ Shader "RayMarchScene"
                 float h = max(k - abs(a - b), 0.0);
                 return min(a, b) - h * h * 0.25 / k;
             }
-            float SmoothSubtract(float a, float b, float k)  { return -SmoothUnion(-a, b, k); }
-            float SmoothIntersect(float a, float b, float k)  { return -SmoothUnion(-a, -b, k); }
+
+            float SmoothSubtract(float a, float b, float k)  { 
+                return -SmoothUnion(-a, b, k); 
+            }
+
+            float SmoothIntersect(float a, float b, float k)  { 
+                return -SmoothUnion(-a, -b, k); 
+            }
 
 
             // Postfix stack evaluator. Primitives push; binary ops pop two and push result;
-            // unary ops modify top in place. Stack depth 16 handles any realistic scene tree.
+            // unary ops modify top in place.
             float EvalScene(float3 p)
             {
                 SdfStack stack = (SdfStack)0;
@@ -134,7 +140,7 @@ Shader "RayMarchScene"
                             float2 q2 = float2(length(lp.xy) - node.typeAndParams.y, lp.z);
                             d = length(q2) - node.typeAndParams.z;
                         }
-                        if (sp < 16)
+                        if (sp < STACK_SIZE)
                         {
                             SetStackValue(stack, sp, d);
                             sp++;
@@ -159,8 +165,8 @@ Shader "RayMarchScene"
                         if      (t == SDF_UNION)            r = min(a, b);
                         else if (t == SDF_SMOOTH_UNION)     r = SmoothUnion(a, b, k);
                         else if (t == SDF_INTERSECT)        r = max(a, b);
-                        else if (t == SDF_SUBTRACT)         r = max(a, -b);
                         else if (t == SDF_SMOOTH_INTERSECT) r = SmoothIntersect(a, b, k);
+                        else if (t == SDF_SUBTRACT)         r = max(a, -b);
                         else                                r = SmoothSubtract(a, b, k); // SDF_SMOOTH_SUBTRACT
                         SetStackValue(stack, sp, r);
                         sp++;

@@ -119,58 +119,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &41646503
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 41646504}
-  - component: {fileID: 41646505}
-  m_Layer: 0
-  m_Name: Box
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &41646504
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 41646503}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.05444783, y: 0.24836627, z: 0.20710097, w: 0.9447005}
-  m_LocalPosition: {x: -0.431, y: 1.211, z: -0.364}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1234067057}
-  m_LocalEulerAnglesHint: {x: 0, y: 29.46, z: 24.73}
---- !u!114 &41646505
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 41646503}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
-  nodeType: 1
-  sphereRadius: 0.5
-  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
-  torusMajorRadius: 0.4
-  torusMinorRadius: 0.15
-  smoothK: 0.3
-  shellThickness: 0.05
-  expandAmount: 0.01
 --- !u!1 &59383917
 GameObject:
   m_ObjectHideFlags: 0
@@ -251,8 +199,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1234067057}
-  - {fileID: 348317757}
+  - {fileID: 313376744}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &273160523
@@ -367,7 +314,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &348317756
+--- !u!1 &313376743
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -375,43 +322,45 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 348317757}
-  - component: {fileID: 348317758}
+  - component: {fileID: 313376744}
+  - component: {fileID: 313376745}
   m_Layer: 0
-  m_Name: Sphere
+  m_Name: Subtract
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &348317757
+--- !u!4 &313376744
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 348317756}
+  m_GameObject: {fileID: 313376743}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.008, y: 1.649, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 2099805010}
+  - {fileID: 1436890908}
   m_Father: {fileID: 98876506}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &348317758
+--- !u!114 &313376745
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 348317756}
+  m_GameObject: {fileID: 313376743}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
-  nodeType: 0
+  nodeType: 13
   sphereRadius: 0.5
   boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
   torusMajorRadius: 0.4
@@ -650,6 +599,58 @@ Transform:
   m_Children: []
   m_Father: {fileID: 59383918}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1142178999
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1142179000}
+  - component: {fileID: 1142179001}
+  m_Layer: 0
+  m_Name: Sphere
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1142179000
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1142178999}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.566, y: 1.418, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2099805010}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1142179001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1142178999}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
+  nodeType: 0
+  sphereRadius: 0.5
+  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
+  torusMajorRadius: 0.4
+  torusMinorRadius: 0.15
+  smoothK: 0
+  shellThickness: 0.05
+  expandAmount: 0.01
 --- !u!1 &1191974066
 GameObject:
   m_ObjectHideFlags: 0
@@ -684,60 +685,6 @@ Transform:
   - {fileID: 7823694314360246851}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1234067056
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1234067057}
-  - component: {fileID: 1234067058}
-  m_Layer: 0
-  m_Name: Union
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1234067057
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1234067056}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 41646504}
-  - {fileID: 1969199538}
-  m_Father: {fileID: 98876506}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1234067058
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1234067056}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
-  nodeType: 10
-  sphereRadius: 0.5
-  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
-  torusMajorRadius: 0.4
-  torusMinorRadius: 0.15
-  smoothK: 0
-  shellThickness: 0.05
-  expandAmount: 0.01
 --- !u!1 &1276148450
 GameObject:
   m_ObjectHideFlags: 1
@@ -788,6 +735,58 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1436890907
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1436890908}
+  - component: {fileID: 1436890909}
+  m_Layer: 0
+  m_Name: Box
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1436890908
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1436890907}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -1.25, y: 1.432, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 313376744}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1436890909
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1436890907}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
+  nodeType: 1
+  sphereRadius: 0.5
+  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
+  torusMajorRadius: 0.4
+  torusMinorRadius: 0.15
+  smoothK: 0
+  shellThickness: 0.05
+  expandAmount: 0.01
 --- !u!1 &1522427159
 GameObject:
   m_ObjectHideFlags: 1
@@ -819,7 +818,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1969199537
+--- !u!1 &2099805009
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -827,50 +826,51 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1969199538}
-  - component: {fileID: 1969199539}
+  - component: {fileID: 2099805010}
+  - component: {fileID: 2099805011}
   m_Layer: 0
-  m_Name: Sphere
+  m_Name: Shell
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1969199538
+--- !u!4 &2099805010
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1969199537}
+  m_GameObject: {fileID: 2099805009}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -1.137, y: 1.345, z: -0.109}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1234067057}
+  m_Children:
+  - {fileID: 1142179000}
+  m_Father: {fileID: 313376744}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1969199539
+--- !u!114 &2099805011
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1969199537}
+  m_GameObject: {fileID: 2099805009}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
-  nodeType: 0
+  nodeType: 20
   sphereRadius: 0.5
   boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
   torusMajorRadius: 0.4
   torusMinorRadius: 0.15
-  smoothK: 0.3
-  shellThickness: 0.05
-  expandAmount: 0.01
+  smoothK: 0
+  shellThickness: 0.00001
+  expandAmount: 0.023
 --- !u!1 &119734848978804391
 GameObject:
   m_ObjectHideFlags: 0

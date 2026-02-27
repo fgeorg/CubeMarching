@@ -12,7 +12,7 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - _BACKFACECULLMODE_DISCARD
+  - _BACKFACECULLMODE_ALPHA
   m_InvalidKeywords:
   - _MARCHMODE_SIMPLE
   m_LightmapFlags: 4
@@ -84,9 +84,9 @@ Material:
     m_Ints: []
     m_Floats:
     - _AlphaClip: 0
-    - _BackfaceCullMax: 0.5
-    - _BackfaceCullMin: 0.1
-    - _BackfaceCullMode: 2
+    - _BackfaceCullMax: 0.301
+    - _BackfaceCullMin: 0.178
+    - _BackfaceCullMode: 1
     - _BackfaceCullThreshold: 0
     - _Blend: 0
     - _BumpScale: 1
@@ -104,7 +104,7 @@ Material:
     - _GlossyReflections: 0
     - _MarchMode: 0
     - _MaxDist: 100
-    - _MaxSteps: 200
+    - _MaxSteps: 40
     - _Metallic: 0
     - _NormalDist: 0.00001
     - _OcclusionStrength: 1
