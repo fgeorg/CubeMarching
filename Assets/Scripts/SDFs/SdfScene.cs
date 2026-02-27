@@ -8,21 +8,21 @@ using UnityEngine;
 public class SdfScene : MonoBehaviour
 {
     [StructLayout(LayoutKind.Sequential)]
-    public struct GpuSdfNode
+    public struct BakedSdfNode
     {
         public Vector4 typeAndParams; // x=type, y=param0, z=param1, w=param2
         public Matrix4x4 transform; // worldToLocalMatrix for primitives; identity for ops
     }
 
     private SdfNodeComponent _rootNode;
-    private readonly List<GpuSdfNode> _nodes = new List<GpuSdfNode>();
+    private readonly List<BakedSdfNode> _nodes = new List<BakedSdfNode>();
     private readonly List<Transform> _primitiveTransforms = new List<Transform>();
     private bool _hierarchyDirty;
     private TransformTracker[] _trackers = Array.Empty<TransformTracker>();
     // Fired after the node list is fully updated. Subscribers (e.g.
     // SdfRayMarchRenderer) build their own GPU buffers from Nodes.
     public event Action Rebuilt;
-    public List<GpuSdfNode> Nodes => _nodes;
+    public List<BakedSdfNode> Nodes => _nodes;
 
     private void OnEnable()
     {
@@ -109,7 +109,7 @@ public class SdfScene : MonoBehaviour
         }
         else
         {
-            // interleave: [C1, C2, op, C3, op, ...] keeps stack depth at 2
+            // interleave: [C1, C2, op, C3, op, ...]
             bool first = true;
             foreach (Transform child in node.transform)
             {
@@ -123,7 +123,7 @@ public class SdfScene : MonoBehaviour
         }
     }
 
-    private static GpuSdfNode MakePrimitive(SdfNodeComponent node)
+    private static BakedSdfNode MakePrimitive(SdfNodeComponent node)
     {
         Vector4 p;
         switch (node.nodeType)
@@ -138,15 +138,15 @@ public class SdfScene : MonoBehaviour
                 p = new Vector4(2, node.torusMajorRadius, node.torusMinorRadius, 0);
                 break;
         }
-        return new GpuSdfNode { typeAndParams = p, transform = node.transform.worldToLocalMatrix };
+        return new BakedSdfNode { typeAndParams = p, transform = node.transform.worldToLocalMatrix };
     }
 
-    private static GpuSdfNode MakeUnary(SdfNodeComponent node)
+    private static BakedSdfNode MakeUnary(SdfNodeComponent node)
     {
         float param = node.nodeType == SdfNodeComponent.SdfNodeType.Shell
             ? node.shellThickness
             : node.expandAmount;
-        return new GpuSdfNode
+        return new BakedSdfNode
         {
             typeAndParams = new Vector4((int)node.nodeType, param, 0, 0),
             transform = Matrix4x4.identity
@@ -159,7 +159,7 @@ public class SdfScene : MonoBehaviour
     private const int GpuSmoothIntersect = 14;
     private const int GpuSmoothSubtract = 15;
 
-    private static GpuSdfNode MakeOp(SdfNodeComponent.SdfNodeType type, float smoothK)
+    private static BakedSdfNode MakeOp(SdfNodeComponent.SdfNodeType type, float smoothK)
     {
         // Automatically pick smooth vs sharp variant based on k.
         bool smooth = smoothK > 0f;
@@ -171,7 +171,7 @@ public class SdfScene : MonoBehaviour
             case SdfNodeComponent.SdfNodeType.Subtract: gpuType = smooth ? GpuSmoothSubtract : (int)type; break;
             default: gpuType = (int)type; break;
         }
-        return new GpuSdfNode
+        return new BakedSdfNode
         {
             typeAndParams = new Vector4(gpuType, smoothK, 0, 0),
             transform = Matrix4x4.identity

@@ -4,14 +4,14 @@ using UnityEngine;
 // CPU stack evaluator — mirrors EvalScene() in SdfSceneDistanceGpu.hlsl.
 public static class SdfSceneDistanceCpu
 {
-    public static float GetDistance(List<SdfScene.GpuSdfNode> nodes, Vector3 p)
+    public static float GetDistance(List<SdfScene.BakedSdfNode> nodes, Vector3 p)
     {
         float[] stack = new float[16];
         int sp = 0;
 
         for (int i = 0; i < nodes.Count; i++)
         {
-            SdfScene.GpuSdfNode node = nodes[i];
+            SdfScene.BakedSdfNode node = nodes[i];
             int t = (int)node.typeAndParams.x;
             float k = node.typeAndParams.y;
 
