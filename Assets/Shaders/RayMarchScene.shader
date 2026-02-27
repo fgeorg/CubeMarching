@@ -10,6 +10,7 @@ Shader "RayMarchScene" {
         _SurfDist ("Surf Dist", Range(0.00001, 0.1)) = 0.001
         _NormalDist ("Normal Dist", Range(0.00001, 0.1)) = 0.01
         _StepFactor ("Step Factor", Range(0.5, 1.0)) = 1.0
+        [KeywordEnum(Disabled, Discrete, Interpolated)] _PrimitiveAlbedoMode ("Primitive Albedo", Float) = 0
         [KeywordEnum(Disabled, Alpha, Discard)] _BackfaceCullMode ("Backface Cull Mode", Float) = 1
         _BackfaceCullMin ("Backface Cull Min", Range(0, 1.0)) = 0.1
         _BackfaceCullMax ("Backface Cull Max", Range(0, 1.0)) = 0.5
@@ -34,6 +35,7 @@ Shader "RayMarchScene" {
             #pragma shader_feature_local _ _MIXED_LIGHTING_SUBTRACTIVE
             #pragma shader_feature _ PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
             #pragma multi_compile_instancing
+            #pragma shader_feature_local _PRIMITIVEALBEDOMODE_DISABLED _PRIMITIVEALBEDOMODE_DISCRETE _PRIMITIVEALBEDOMODE_INTERPOLATED
             #pragma shader_feature_local _BACKFACECULLMODE_DISABLED _BACKFACECULLMODE_ALPHA _BACKFACECULLMODE_DISCARD
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -131,7 +133,13 @@ Shader "RayMarchScene" {
                 half3 normalWS = normalize(half3(GetNormal(p)));
 
                 SurfaceData surfaceData = (SurfaceData)0;
+                #if defined(_PRIMITIVEALBEDOMODE_DISCRETE)
+                surfaceData.albedo     = half3(_Tint.rgb * GetAlbedoAtSceneDiscrete(p).rgb);
+                #elif defined(_PRIMITIVEALBEDOMODE_INTERPOLATED)
+                surfaceData.albedo     = half3(_Tint.rgb * GetAlbedoAtSceneInterpolated(p).rgb);
+                #else
                 surfaceData.albedo     = half3(_Tint.rgb);
+                #endif
                 surfaceData.metallic   = (half)_Metallic;
                 surfaceData.smoothness = (half)_Smoothness;
                 surfaceData.occlusion  = 1.0h;

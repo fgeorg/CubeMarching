@@ -43,6 +43,7 @@ public class RayMarchMaterialEditor : ShaderGUI {
 
         // --- SDF ---
         EditorGUILayout.LabelField("SDF", EditorStyles.boldLabel);
+        Draw("_PrimitiveAlbedoMode");
 
         EditorGUILayout.Space();
 

@@ -112,4 +112,61 @@ float GetDistanceToScene(float3 p) {
     return sp > 0 ? GetStackValue(stack, 0) : 1e10;
 }
 
+// Returns the albedo of the geometrically closest primitive (hard assignment).
+float4 GetAlbedoAtSceneDiscrete(float3 p) {
+    float closestDist = 1e10;
+    float4 closestAlbedo = float4(1, 1, 1, 1);
+    [loop]
+    for (int i = 0; i < _SdfNodeCount; i++) {
+        SdfNode node = _SdfNodes[i];
+        int t = (int)node.typeAndParams.x;
+        if (t < SDF_PRIMITIVES_END) {
+            float3 lp = mul(_SdfPrimitives[node.primitiveIndex].transform, float4(p, 1.0)).xyz;
+            float d;
+            if (t == SDF_SPHERE) {
+                d = abs(SdfSphere(lp, node.typeAndParams.y));
+            }
+            else if (t == SDF_BOX) {
+                d = abs(SdfBox(lp, node.typeAndParams.yzw));
+            }
+            else { // SDF_TORUS
+                d = abs(SdfTorus(lp, node.typeAndParams.y, node.typeAndParams.z));
+            }
+            if (d < closestDist) {
+                closestDist = d;
+                closestAlbedo = _SdfPrimitives[node.primitiveIndex].albedo;
+            }
+        }
+    }
+    return closestAlbedo;
+}
+
+// Returns a smooth albedo blend across all primitives, weighted by inverse-square distance.
+float4 GetAlbedoAtSceneInterpolated(float3 p) {
+    float4 weightedAlbedo = float4(0, 0, 0, 0);
+    float totalWeight = 0;
+    [loop]
+    for (int i = 0; i < _SdfNodeCount; i++) {
+        SdfNode node = _SdfNodes[i];
+        int t = (int)node.typeAndParams.x;
+        if (t < SDF_PRIMITIVES_END) {
+            float3 lp = mul(_SdfPrimitives[node.primitiveIndex].transform, float4(p, 1.0)).xyz;
+            float d;
+            if (t == SDF_SPHERE) {
+                d = abs(SdfSphere(lp, node.typeAndParams.y));
+            }
+            else if (t == SDF_BOX) {
+                d = abs(SdfBox(lp, node.typeAndParams.yzw));
+            }
+            else { // SDF_TORUS
+                d = abs(SdfTorus(lp, node.typeAndParams.y, node.typeAndParams.z));
+            }
+            float w = 1.0 / max(d * d, 1e-6);
+            weightedAlbedo += _SdfPrimitives[node.primitiveIndex].albedo * w;
+            totalWeight += w;
+        }
+    }
+    return totalWeight > 0 ? weightedAlbedo / totalWeight : float4(1, 1, 1, 1);
+}
+
 #endif
