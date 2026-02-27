@@ -1,7 +1,7 @@
 #ifndef SDF_SCENE_DISTANCE_GPU_HLSL
 #define SDF_SCENE_DISTANCE_GPU_HLSL
 
-#include "SdfNodeTypes.hlsl"
+#include "SdfNodeType.hlsl"
 #include "SdfStack.hlsl"
 
 struct SdfNode

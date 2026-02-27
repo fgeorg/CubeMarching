@@ -1,7 +1,7 @@
 #ifndef SDF_STACK_HLSL
 #define SDF_STACK_HLSL
 
-// Metal does not support dynamic indexing into temporary arrays (e.g. float stack[16]; stack[i]),
+// Metal does not support dynamic indexing into temporary arrays (e.g. float stack[8]; stack[i]),
 // so the stack is stored as named scalar fields with switch-based accessors to work around this.
 #define STACK_SIZE 8
 struct SdfStack
