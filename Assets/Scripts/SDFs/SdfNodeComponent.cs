@@ -4,6 +4,7 @@ using UnityEngine;
 public class SdfNodeComponent : MonoBehaviour
 {
     public SdfNodeType nodeType = SdfNodeType.Union;
+    public Color albedo = Color.white;
 
     private void OnEnable()  => GetComponentInParent<SdfScene>()?.MarkDirty();
     private void OnDisable() => GetComponentInParent<SdfScene>()?.MarkDirty();

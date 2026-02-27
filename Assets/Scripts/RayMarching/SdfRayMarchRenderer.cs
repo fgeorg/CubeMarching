@@ -10,6 +10,7 @@ public class SdfRayMarchRenderer : MonoBehaviour
     private Renderer _renderer;
     private MaterialPropertyBlock _propertyBlock;
     private GraphicsBuffer _buffer;
+    private GraphicsBuffer _primitivesBuffer;
 
     private void OnEnable()
     {
@@ -24,6 +25,8 @@ public class SdfRayMarchRenderer : MonoBehaviour
         if (_sdfScene != null) _sdfScene.Rebuilt -= OnRebuilt;
         _buffer?.Release();
         _buffer = null;
+        _primitivesBuffer?.Release();
+        _primitivesBuffer = null;
     }
 
     private void OnRebuilt()
@@ -31,7 +34,9 @@ public class SdfRayMarchRenderer : MonoBehaviour
         if (_renderer == null || _sdfScene == null) return;
 
         var nodes = _sdfScene.Nodes;
+        var primitives = _sdfScene.Primitives;
         int count = nodes.Count;
+        int primCount = primitives.Count;
 
         // Metal requires the buffer to always be bound, even when count is 0.
         // Allocate a minimum 1-element buffer and use _SdfNodeCount to gate the loop.
@@ -39,13 +44,25 @@ public class SdfRayMarchRenderer : MonoBehaviour
         if (_buffer == null || _buffer.count != bufferSize)
         {
             _buffer?.Release();
-            _buffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, bufferSize, 80);
+            // BakedSdfNode: float4 (16) + int (4) = 20 bytes
+            _buffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, bufferSize, 20);
+        }
+
+        int primBufferSize = Mathf.Max(primCount, 1);
+        if (_primitivesBuffer == null || _primitivesBuffer.count != primBufferSize)
+        {
+            _primitivesBuffer?.Release();
+            // BakedSdfPrimitive: Matrix4x4 (64) + Vector4 albedo (16) = 80 bytes
+            _primitivesBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, primBufferSize, 80);
         }
 
         if (count > 0)
             _buffer.SetData(nodes);
+        if (primCount > 0)
+            _primitivesBuffer.SetData(primitives);
 
         _propertyBlock.SetBuffer("_SdfNodes", _buffer);
+        _propertyBlock.SetBuffer("_SdfPrimitives", _primitivesBuffer);
         _propertyBlock.SetInteger("_SdfNodeCount", count);
         _renderer.SetPropertyBlock(_propertyBlock);
     }

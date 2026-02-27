@@ -3,7 +3,7 @@ using UnityEngine;
 
 // CPU stack evaluator — mirrors EvalScene() in SdfSceneDistanceGpu.hlsl.
 public static class SdfSceneDistanceCpu {
-    public static float GetDistance(List<SdfScene.BakedSdfNode> nodes, Vector3 p) {
+    public static float GetDistance(List<SdfScene.BakedSdfNode> nodes, List<SdfScene.BakedSdfPrimitive> primitives, Vector3 p) {
         float[] stack = new float[16];
         int sp = 0;
 
@@ -16,7 +16,7 @@ public static class SdfSceneDistanceCpu {
 
             if ((int)t < SdfNodeTypeRanges.PrimitivesEnd) {
                 // primitive → push
-                Vector3 lp = node.transform.MultiplyPoint3x4(p);
+                Vector3 lp = primitives[node.primitiveIndex].transform.MultiplyPoint3x4(p);
                 switch (t) {
                     case SdfNodeType.Sphere:
                         d = SdfSphere(lp, node.typeAndParams.y);

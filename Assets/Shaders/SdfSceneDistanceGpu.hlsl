@@ -7,10 +7,15 @@
 struct SdfNode {
     // x=type, y=param0, z=param1, w=param2
     float4 typeAndParams;
-    // worldToLocal transform matrix
-    float4x4 transform;
+    int primitiveIndex; // index into _SdfPrimitives; -1 for ops
 };
 StructuredBuffer<SdfNode> _SdfNodes;
+
+struct SdfPrimitive {
+    float4x4 transform; // worldToLocal
+    float4 albedo;
+};
+StructuredBuffer<SdfPrimitive> _SdfPrimitives;
 
 // Primitive SDFs — https://iquilezles.org/articles/distfunctions/
 float SdfSphere(float3 p, float r) {
@@ -54,7 +59,7 @@ float GetDistanceToScene(float3 p) {
         float k = node.typeAndParams.y;
         if (t < SDF_PRIMITIVES_END) { // primitive — push
             // convert to local space before evaluating the distance function
-            float3 lp = mul(node.transform, float4(p, 1.0)).xyz;
+            float3 lp = mul(_SdfPrimitives[node.primitiveIndex].transform, float4(p, 1.0)).xyz;
             float d;
             if (t == SDF_SPHERE) {
                 d = SdfSphere(lp, node.typeAndParams.y);

@@ -2,10 +2,8 @@ using UnityEditor;
 using UnityEngine;
 
 [CustomEditor(typeof(SdfNodeComponent))]
-public class SdfNodeComponentEditor : Editor
-{
-    public override void OnInspectorGUI()
-    {
+public class SdfNodeComponentEditor : Editor {
+    public override void OnInspectorGUI() {
         serializedObject.Update();
 
         var typeProp = serializedObject.FindProperty("nodeType");
@@ -13,20 +11,17 @@ public class SdfNodeComponentEditor : Editor
         EditorGUILayout.PropertyField(typeProp, new GUIContent("Type"));
         bool typeChanged = EditorGUI.EndChangeCheck();
 
-        if (typeChanged)
-        {
+        if (typeChanged) {
             serializedObject.ApplyModifiedProperties();
             var node = (SdfNodeComponent)target;
-            if (node.GetComponent<SdfScene>() == null)
-            {
+            if (node.GetComponent<SdfScene>() == null) {
                 Undo.RecordObject(node.gameObject, "Rename SDF Node");
                 node.gameObject.name = NodeTypeName(node.nodeType);
             }
         }
 
         var current = (SdfNodeComponent)target;
-        switch (current.nodeType)
-        {
+        switch (current.nodeType) {
             case SdfNodeType.Sphere:
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("sphereRadius"), new GUIContent("Radius"));
                 break;
@@ -48,6 +43,10 @@ public class SdfNodeComponentEditor : Editor
             case SdfNodeType.Expand:
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("expandAmount"), new GUIContent("Amount"));
                 break;
+        }
+
+        if ((int)current.nodeType < SdfNodeTypeRanges.PrimitivesEnd) {
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("albedo"), new GUIContent("Albedo"));
         }
 
         serializedObject.ApplyModifiedProperties();

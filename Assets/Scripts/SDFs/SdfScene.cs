@@ -11,11 +11,19 @@ public class SdfScene : MonoBehaviour
     public struct BakedSdfNode
     {
         public Vector4 typeAndParams; // x=type, y=param0, z=param1, w=param2
-        public Matrix4x4 transform; // worldToLocalMatrix for primitives; identity for ops
+        public int primitiveIndex;    // index into Primitives; -1 for ops
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct BakedSdfPrimitive
+    {
+        public Matrix4x4 transform; // worldToLocal
+        public Vector4 albedo;
     }
 
     private SdfNodeComponent _rootNode;
     private readonly List<BakedSdfNode> _nodes = new List<BakedSdfNode>();
+    private readonly List<BakedSdfPrimitive> _primitives = new List<BakedSdfPrimitive>();
     private readonly List<Transform> _primitiveTransforms = new List<Transform>();
     private bool _hierarchyDirty;
     private TransformTracker[] _trackers = Array.Empty<TransformTracker>();
@@ -23,6 +31,7 @@ public class SdfScene : MonoBehaviour
     // SdfRayMarchRenderer) build their own GPU buffers from Nodes.
     public event Action Rebuilt;
     public List<BakedSdfNode> Nodes => _nodes;
+    public List<BakedSdfPrimitive> Primitives => _primitives;
 
     private void OnEnable()
     {
@@ -63,6 +72,7 @@ public class SdfScene : MonoBehaviour
     {
         _hierarchyDirty = false;
         _nodes.Clear();
+        _primitives.Clear();
         _primitiveTransforms.Clear();
 
         AppendPostfix(_rootNode);
@@ -79,7 +89,13 @@ public class SdfScene : MonoBehaviour
     {
         if ((int)node.nodeType < SdfNodeTypeRanges.PrimitivesEnd)
         {
-            _nodes.Add(MakePrimitive(node));
+            int primIdx = _primitives.Count;
+            _primitives.Add(new BakedSdfPrimitive
+            {
+                transform = node.transform.worldToLocalMatrix,
+                albedo = (Vector4)node.albedo,
+            });
+            _nodes.Add(MakePrimitive(node, primIdx));
             _primitiveTransforms.Add(node.transform);
             // Union any children with this primitive: [prim, C1, Union, C2, Union, ...]
             foreach (Transform child in node.transform)
@@ -123,7 +139,7 @@ public class SdfScene : MonoBehaviour
         }
     }
 
-    private static BakedSdfNode MakePrimitive(SdfNodeComponent node)
+    private static BakedSdfNode MakePrimitive(SdfNodeComponent node, int primitiveIndex)
     {
         Vector4 p;
         switch (node.nodeType)
@@ -138,7 +154,7 @@ public class SdfScene : MonoBehaviour
                 p = new Vector4(2, node.torusMajorRadius, node.torusMinorRadius, 0);
                 break;
         }
-        return new BakedSdfNode { typeAndParams = p, transform = node.transform.worldToLocalMatrix };
+        return new BakedSdfNode { typeAndParams = p, primitiveIndex = primitiveIndex };
     }
 
     private static BakedSdfNode MakeUnary(SdfNodeComponent node)
@@ -149,7 +165,7 @@ public class SdfScene : MonoBehaviour
         return new BakedSdfNode
         {
             typeAndParams = new Vector4((int)node.nodeType, param, 0, 0),
-            transform = Matrix4x4.identity
+            primitiveIndex = -1,
         };
     }
 
@@ -174,9 +190,9 @@ public class SdfScene : MonoBehaviour
         return new BakedSdfNode
         {
             typeAndParams = new Vector4(gpuType, smoothK, 0, 0),
-            transform = Matrix4x4.identity
+            primitiveIndex = -1,
         };
     }
 
-    public float GetDistance(Vector3 p) => SdfSceneDistanceCpu.GetDistance(_nodes, p);
+    public float GetDistance(Vector3 p) => SdfSceneDistanceCpu.GetDistance(_nodes, _primitives, p);
 }
