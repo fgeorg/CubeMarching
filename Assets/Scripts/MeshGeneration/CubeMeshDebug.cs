@@ -39,8 +39,7 @@ public class CubeMeshDebug : MonoBehaviour {
     private void OnCornerActiveChanged(int index, bool active) {
         if (active) {
             _includedCornersBits |= (byte)(1 << index);
-        }
-        else {
+        } else {
             _includedCornersBits &= (byte)~(1 << index);
         }
         _shouldRegenerate = true;
@@ -78,8 +77,8 @@ public class CubeMeshDebug : MonoBehaviour {
             Debug.Log($"1 << i ({i}) = {1 << i}");
             _cornerSpheres[i].SetActive((_includedCornersBits & (1 << i)) != 0);
         }
-
-        var tris = MarchTables.triangulation[~_includedCornersBits & 255]; // flip inside and outside because the table uses the opposite winding order from Unity
+        // flip inside and outside because the table uses the opposite winding order from Unity
+        var tris = MarchTables.triangulation[~_includedCornersBits & 255];
         foreach (var tri in tris) {
             _triangles.Add(_vertices.Count);
             _vertices.Add(MarchTables.edgePoints[tri] - 0.5f * Vector3.one);

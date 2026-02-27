@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
+// NOTE: This class has grown large enough that splitting the cell-generator
+// logic (AddCube/AddVoxel and their dedup counterparts) into separate helper
+// classes may be worth considering.
 [ExecuteInEditMode]
 public class MeshGenerator : MonoBehaviour {
     public enum EAlgorithm {
@@ -35,6 +38,7 @@ public class MeshGenerator : MonoBehaviour {
     private List<Vector3> _vertices = new List<Vector3>();
     private List<int> _triangles = new List<int>();
     private List<Vector3> _normals = new List<Vector3>();
+    private readonly List<Vector2> _barycentrics = new List<Vector2>();
 
     // Edge cache for during-generation dedup (marching cubes smooth path)
     private Dictionary<long, int> _edgeVertexCache = new Dictionary<long, int>();
@@ -45,20 +49,30 @@ public class MeshGenerator : MonoBehaviour {
     private Mesh _fullMesh;
     private Mesh _dedupedMesh;
 
+    // ─── Unity lifecycle ──────────────────────────────────────────────────────
+
     public void MarkDirty() {
         _shouldRegenerate = true;
     }
 
     protected void OnEnable() {
-        if (_sdfScene != null) _sdfScene.Rebuilt += MarkDirty;
+        if (_sdfScene != null) {
+            _sdfScene.Rebuilt += MarkDirty;
+        }
         _selfTracker = new TransformTracker(transform);
         MarkDirty();
     }
 
     protected void OnDisable() {
-        if (_fullMesh != null) _fullMesh.Clear();
-        if (_dedupedMesh != null) _dedupedMesh.Clear();
-        if (_sdfScene != null) _sdfScene.Rebuilt -= MarkDirty;
+        if (_fullMesh != null) {
+            _fullMesh.Clear();
+        }
+        if (_dedupedMesh != null) {
+            _dedupedMesh.Clear();
+        }
+        if (_sdfScene != null) {
+            _sdfScene.Rebuilt -= MarkDirty;
+        }
     }
 
     protected void OnValidate() {
@@ -66,26 +80,29 @@ public class MeshGenerator : MonoBehaviour {
     }
 
     protected void Update() {
-        if (_selfTracker.HasChanged()) _shouldRegenerate = true;
+        if (_selfTracker.HasChanged()) {
+            _shouldRegenerate = true;
+        }
         if (_shouldRegenerate) {
             Regenerate();
         }
     }
 
+    // ─── Top-level regeneration dispatch ─────────────────────────────────────
+
     protected void Regenerate() {
         _shouldRegenerate = false;
         float cubeSize = 1.0f / _resolution;
-        if (_fullMeshFilter != null) RegenerateWireframe(cubeSize);
-        if (_dedupedMeshFilter != null) RegenerateDeduped(cubeSize);
+        if (_fullMeshFilter != null) {
+            RegenerateWireframe(cubeSize);
+        }
+        if (_dedupedMeshFilter != null) {
+            RegenerateDeduped(cubeSize);
+        }
     }
 
-    // ─── Wireframe path ──────────────────────────────────────────────────────
     // No dedup — index buffer is always sequential (0, 1, 2, 3, 4, 5, …).
-    // Barycentrics are baked into UV channel 1 (TEXCOORD1) so the shader
-    // doesn't depend on SV_VertexID, which is unreliable in Unity's URP pipeline.
-
-    private readonly List<Vector2> _barycentrics = new List<Vector2>();
-
+    // Barycentrics are baked into UV channel 1 (TEXCOORD1)
     private void RegenerateWireframe(float cubeSize) {
         if (_fullMesh == null) {
             _fullMesh = new Mesh();
@@ -117,30 +134,20 @@ public class MeshGenerator : MonoBehaviour {
 
         ProjectVerticesToSurface();
 
-        // TODO: we can likely do this in the shader itself using vertex index
-        if (_algorithm == EAlgorithm.MarchingCubes) {
-            // Bake per-vertex barycentric coordinates into UV1.
-            // Sequential index buffer guarantees vertex i is always position (i % 3) in its triangle.
-            _barycentrics.Clear();
-            for (int i = 0; i < _vertices.Count; i++) {
-                int pos = i % 3;
-                _barycentrics.Add(pos == 0 ? new Vector2(1, 0) :
-                                  pos == 1 ? new Vector2(0, 1) : Vector2.zero);
-            }
-        } else {
-            _barycentrics.Clear();
-            for (int i = 0; i < _vertices.Count; i++) {
-                int pos = i % 4;
-                _barycentrics.Add(pos == 0 ? new Vector2(1, 0) :
-                                  pos == 1 || pos == 3 ? new Vector2(0, 1) :
-                                  Vector2.zero);
-            }
+        // Bake per-vertex barycentric coordinates into UV1.
+        // Sequential index buffer guarantees vertex i is always position (i % 3) in its triangle.
+        _barycentrics.Clear();
+        bool isMC = _algorithm == EAlgorithm.MarchingCubes;
+        for (int i = 0; i < _vertices.Count; i++) {
+            int pos = i % (isMC ? 3 : 4);
+            _barycentrics.Add(pos == 0 ? new Vector2(1, 0) :
+                              (pos == 1 || (!isMC && pos == 3)) ? new Vector2(0, 1) :
+                              Vector2.zero);
         }
 
         _fullMesh.SetVertices(_vertices);
         _fullMesh.SetTriangles(_triangles, 0);
         DebugStore.Set("Full", $"{_vertices.Count} v   {_triangles.Count / 3} t");
-
         _fullMesh.SetUVs(1, _barycentrics);
         ApplyNormals(_fullMesh);
     }
@@ -157,28 +164,22 @@ public class MeshGenerator : MonoBehaviour {
 
         if (_algorithm == EAlgorithm.MarchingCubes) {
             _edgeVertexCache.Clear();
-            bool earlyExit = false;
-            for (int x = 0; x < _resolution && !earlyExit; x++) {
-                for (int y = 0; y < _resolution && !earlyExit; y++) {
-                    for (int z = 0; z < _resolution; z++) {
-                        AddCubeWithEdgeDedup(x, y, z, cubeSize);
-                        float percentDone = (float)(x * _resolution * _resolution + y * _resolution + z)
-                                          / (_resolution * _resolution * _resolution);
-                        if (percentDone > _cubeMarchStepsToShow) { earlyExit = true; break; }
-                    }
-                }
-            }
         } else {
             _cornerVertexCache.Clear();
-            bool earlyExit = false;
-            for (int x = 0; x < _resolution && !earlyExit; x++) {
-                for (int y = 0; y < _resolution && !earlyExit; y++) {
-                    for (int z = 0; z < _resolution; z++) {
+        }
+
+        bool earlyExit = false;
+        for (int x = 0; x < _resolution && !earlyExit; x++) {
+            for (int y = 0; y < _resolution && !earlyExit; y++) {
+                for (int z = 0; z < _resolution; z++) {
+                    if (_algorithm == EAlgorithm.MarchingCubes) {
+                        AddCubeWithEdgeDedup(x, y, z, cubeSize);
+                    } else {
                         AddVoxelWithCornerDedup(x, y, z, cubeSize);
-                        float percentDone = (float)(x * _resolution * _resolution + y * _resolution + z)
-                                          / (_resolution * _resolution * _resolution);
-                        if (percentDone > _cubeMarchStepsToShow) { earlyExit = true; break; }
                     }
+                    float percentDone = (float)(x * _resolution * _resolution + y * _resolution + z)
+                                      / (_resolution * _resolution * _resolution);
+                    if (percentDone > _cubeMarchStepsToShow) { earlyExit = true; break; }
                 }
             }
         }
@@ -190,49 +191,79 @@ public class MeshGenerator : MonoBehaviour {
         ApplyNormals(_dedupedMesh);
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────────
+    // ─── Wireframe (non-dedup) cell generators ────────────────────────────────
 
-    private void ApplyNormals(Mesh mesh) {
-        if (_getNormalsFromSDF) {
-            _normals.Clear();
-            for (int i = 0; i < _vertices.Count; i++) {
-                _normals.Add(GetNormal(_vertices[i]));
-            }
-            mesh.SetNormals(_normals);
-        } else {
-            mesh.RecalculateNormals();
+    protected void AddCube(List<Vector3> vertices, List<int> triangles, int xi, int yi, int zi, float cubeSize) {
+        int bits = GetCornerBits(xi, yi, zi, cubeSize);
+        var origin = PointAtIndices(xi, yi, zi, cubeSize);
+        var cubeDim = (_bounds.max - _bounds.min) * cubeSize;
+
+        var tris = MarchTables.triangulation[~bits & 255];
+        foreach (var tri in tris) {
+            _triangles.Add(_vertices.Count);
+            var edgePoint = MarchTables.edgePoints[tri];
+            _vertices.Add(new Vector3(origin.x + edgePoint.x * cubeDim.x,
+                                      origin.y + edgePoint.y * cubeDim.y,
+                                      origin.z + edgePoint.z * cubeDim.z));
         }
     }
 
-    protected Vector3 CenterPointAtIndices(int x, int y, int z, float cubeSize) {
-        return new Vector3(
-            (x + 0.5f) * cubeSize * (_bounds.max.x - _bounds.min.x) + _bounds.min.x,
-            (y + 0.5f) * cubeSize * (_bounds.max.y - _bounds.min.y) + _bounds.min.y,
-            (z + 0.5f) * cubeSize * (_bounds.max.z - _bounds.min.z) + _bounds.min.z
-        );
-    }
+    protected void AddVoxel(List<Vector3> vertices, List<int> triangles, int xi, int yi, int zi, float cubeSize) {
+        if (GetDistance(CenterPointAtIndices(xi, yi, zi, cubeSize)) > 0) { return; }
 
-    protected Vector3 PointAtIndices(int x, int y, int z, float cubeSize) {
-        return new Vector3(
-            x * cubeSize * (_bounds.max.x - _bounds.min.x) + _bounds.min.x,
-            y * cubeSize * (_bounds.max.y - _bounds.min.y) + _bounds.min.y,
-            z * cubeSize * (_bounds.max.z - _bounds.min.z) + _bounds.min.z
-        );
-    }
+        // Corners keyed by integer grid indices via PointAtIndices.
+        // Each corner is computed as: n * cubeSize * (max - min) + min
+        // Two adjacent voxels sharing a corner call PointAtIndices with the same integer n,
+        // so they take an identical arithmetic path and get bit-identical floats.
+        // This makes Dictionary<Vector3, int> dedup safe (no float-equality ambiguity).
+        Vector3 p000 = PointAtIndices(xi, yi, zi, cubeSize);
+        Vector3 p100 = PointAtIndices(xi + 1, yi, zi, cubeSize);
+        Vector3 p010 = PointAtIndices(xi, yi + 1, zi, cubeSize);
+        Vector3 p110 = PointAtIndices(xi + 1, yi + 1, zi, cubeSize);
+        Vector3 p001 = PointAtIndices(xi, yi, zi + 1, cubeSize);
+        Vector3 p101 = PointAtIndices(xi + 1, yi, zi + 1, cubeSize);
+        Vector3 p011 = PointAtIndices(xi, yi + 1, zi + 1, cubeSize);
+        Vector3 p111 = PointAtIndices(xi + 1, yi + 1, zi + 1, cubeSize);
 
-    protected void ProjectVerticesToSurface() {
-        for (int i = 0; i < _vertices.Count; i++) {
-            for (int j = 0; j < _projectionSteps; j++) {
-                var n = GetNormal(_vertices[i]);
-                _vertices[i] -= n * GetDistance(_vertices[i]) * _projectionAmount;
-            }
+        if (GetDistance(CenterPointAtIndices(xi, yi - 1, zi, cubeSize)) > 0) {
+            vertices.Add(p000); vertices.Add(p100); vertices.Add(p101); vertices.Add(p001);
+            AddQuadIndices(triangles, vertices.Count);
+        }
+        if (GetDistance(CenterPointAtIndices(xi, yi + 1, zi, cubeSize)) > 0) {
+            vertices.Add(p010); vertices.Add(p011); vertices.Add(p111); vertices.Add(p110);
+            AddQuadIndices(triangles, vertices.Count);
+        }
+        if (GetDistance(CenterPointAtIndices(xi - 1, yi, zi, cubeSize)) > 0) {
+            vertices.Add(p000); vertices.Add(p001); vertices.Add(p011); vertices.Add(p010);
+            AddQuadIndices(triangles, vertices.Count);
+        }
+        if (GetDistance(CenterPointAtIndices(xi + 1, yi, zi, cubeSize)) > 0) {
+            vertices.Add(p100); vertices.Add(p110); vertices.Add(p111); vertices.Add(p101);
+            AddQuadIndices(triangles, vertices.Count);
+        }
+        if (GetDistance(CenterPointAtIndices(xi, yi, zi - 1, cubeSize)) > 0) {
+            vertices.Add(p000); vertices.Add(p010); vertices.Add(p110); vertices.Add(p100);
+            AddQuadIndices(triangles, vertices.Count);
+        }
+        if (GetDistance(CenterPointAtIndices(xi, yi, zi + 1, cubeSize)) > 0) {
+            vertices.Add(p001); vertices.Add(p101); vertices.Add(p111); vertices.Add(p011);
+            AddQuadIndices(triangles, vertices.Count);
         }
     }
 
-    // During-generation dedup for the marching cubes smooth path.
-    // Each triangle vertex lies on a cube edge; the EdgeKey uniquely identifies
-    // that edge regardless of which adjacent cube visits it first.
-    private void AddCubeWithEdgeDedup(int xi, int yi, int zi, float cubeSize) {
+    protected void AddQuadIndices(List<int> triangles, int endIndex) {
+        triangles.Add(endIndex - 4);
+        triangles.Add(endIndex - 3);
+        triangles.Add(endIndex - 2);
+        triangles.Add(endIndex - 4);
+        triangles.Add(endIndex - 2);
+        triangles.Add(endIndex - 1);
+    }
+
+    // ─── Dedup cell generators ────────────────────────────────────────────────
+
+    // Shared: compute the 8-corner sign bitmask for the cube at (xi, yi, zi).
+    private int GetCornerBits(int xi, int yi, int zi, float cubeSize) {
         int bits =
                 GetDistance(PointAtIndices(xi + 0, yi + 0, zi + 1, cubeSize)) < 0 ? (1 << 0) : 0;
         bits |= GetDistance(PointAtIndices(xi + 1, yi + 0, zi + 1, cubeSize)) < 0 ? (1 << 1) : 0;
@@ -242,7 +273,13 @@ public class MeshGenerator : MonoBehaviour {
         bits |= GetDistance(PointAtIndices(xi + 1, yi + 1, zi + 1, cubeSize)) < 0 ? (1 << 5) : 0;
         bits |= GetDistance(PointAtIndices(xi + 1, yi + 1, zi + 0, cubeSize)) < 0 ? (1 << 6) : 0;
         bits |= GetDistance(PointAtIndices(xi + 0, yi + 1, zi + 0, cubeSize)) < 0 ? (1 << 7) : 0;
+        return bits;
+    }
 
+    // Each triangle vertex lies on a cube edge; the EdgeKey uniquely identifies
+    // that edge regardless of which adjacent cube visits it first.
+    private void AddCubeWithEdgeDedup(int xi, int yi, int zi, float cubeSize) {
+        int bits = GetCornerBits(xi, yi, zi, cubeSize);
         var origin = PointAtIndices(xi, yi, zi, cubeSize);
         var cubeDim = (_bounds.max - _bounds.min) * cubeSize;
         int stride = _resolution + 1;
@@ -281,70 +318,69 @@ public class MeshGenerator : MonoBehaviour {
         return ((long)lo << 32) | (uint)hi;
     }
 
-    // During-generation dedup for the voxel smooth path.
     // Keyed on integer grid coordinates (xi, yi, zi) — no float comparison, no ambiguity.
     private void AddVoxelWithCornerDedup(int xi, int yi, int zi, float cubeSize) {
-        if (GetDistance(CenterPointAtIndices(xi, yi, zi, cubeSize)) > 0) return;
+        if (GetDistance(CenterPointAtIndices(xi, yi, zi, cubeSize)) > 0) { return; }
 
-        //below (-Y face)
         if (GetDistance(CenterPointAtIndices(xi, yi - 1, zi, cubeSize)) > 0) {
-            int i000 = GetOrAddVoxelCorner(xi, yi, zi, cubeSize);
-            int i100 = GetOrAddVoxelCorner(xi + 1, yi, zi, cubeSize);
-            int i101 = GetOrAddVoxelCorner(xi + 1, yi, zi + 1, cubeSize);
-            int i001 = GetOrAddVoxelCorner(xi, yi, zi + 1, cubeSize);
-            _triangles.Add(i000); _triangles.Add(i100); _triangles.Add(i101);
-            _triangles.Add(i000); _triangles.Add(i101); _triangles.Add(i001);
+            AddDedupedQuad((xi,     yi, zi),
+                           (xi + 1, yi, zi),
+                           (xi + 1, yi, zi + 1),
+                           (xi,     yi, zi + 1),
+                           cubeSize);
         }
-        //above (+Y face)
         if (GetDistance(CenterPointAtIndices(xi, yi + 1, zi, cubeSize)) > 0) {
-            int i010 = GetOrAddVoxelCorner(xi, yi + 1, zi, cubeSize);
-            int i011 = GetOrAddVoxelCorner(xi, yi + 1, zi + 1, cubeSize);
-            int i111 = GetOrAddVoxelCorner(xi + 1, yi + 1, zi + 1, cubeSize);
-            int i110 = GetOrAddVoxelCorner(xi + 1, yi + 1, zi, cubeSize);
-            _triangles.Add(i010); _triangles.Add(i011); _triangles.Add(i111);
-            _triangles.Add(i010); _triangles.Add(i111); _triangles.Add(i110);
+            AddDedupedQuad((xi,     yi + 1, zi),
+                           (xi,     yi + 1, zi + 1),
+                           (xi + 1, yi + 1, zi + 1),
+                           (xi + 1, yi + 1, zi),
+                           cubeSize);
         }
-        //left (-X face)
         if (GetDistance(CenterPointAtIndices(xi - 1, yi, zi, cubeSize)) > 0) {
-            int i000 = GetOrAddVoxelCorner(xi, yi, zi, cubeSize);
-            int i001 = GetOrAddVoxelCorner(xi, yi, zi + 1, cubeSize);
-            int i011 = GetOrAddVoxelCorner(xi, yi + 1, zi + 1, cubeSize);
-            int i010 = GetOrAddVoxelCorner(xi, yi + 1, zi, cubeSize);
-            _triangles.Add(i000); _triangles.Add(i001); _triangles.Add(i011);
-            _triangles.Add(i000); _triangles.Add(i011); _triangles.Add(i010);
+            AddDedupedQuad((xi, yi,     zi),
+                           (xi, yi,     zi + 1),
+                           (xi, yi + 1, zi + 1),
+                           (xi, yi + 1, zi),
+                           cubeSize);
         }
-        //right (+X face)
         if (GetDistance(CenterPointAtIndices(xi + 1, yi, zi, cubeSize)) > 0) {
-            int i100 = GetOrAddVoxelCorner(xi + 1, yi, zi, cubeSize);
-            int i110 = GetOrAddVoxelCorner(xi + 1, yi + 1, zi, cubeSize);
-            int i111 = GetOrAddVoxelCorner(xi + 1, yi + 1, zi + 1, cubeSize);
-            int i101 = GetOrAddVoxelCorner(xi + 1, yi, zi + 1, cubeSize);
-            _triangles.Add(i100); _triangles.Add(i110); _triangles.Add(i111);
-            _triangles.Add(i100); _triangles.Add(i111); _triangles.Add(i101);
+            AddDedupedQuad((xi + 1, yi,     zi),
+                           (xi + 1, yi + 1, zi),
+                           (xi + 1, yi + 1, zi + 1),
+                           (xi + 1, yi,     zi + 1),
+                           cubeSize);
         }
-        //front (-Z face)
         if (GetDistance(CenterPointAtIndices(xi, yi, zi - 1, cubeSize)) > 0) {
-            int i000 = GetOrAddVoxelCorner(xi, yi, zi, cubeSize);
-            int i010 = GetOrAddVoxelCorner(xi, yi + 1, zi, cubeSize);
-            int i110 = GetOrAddVoxelCorner(xi + 1, yi + 1, zi, cubeSize);
-            int i100 = GetOrAddVoxelCorner(xi + 1, yi, zi, cubeSize);
-            _triangles.Add(i000); _triangles.Add(i010); _triangles.Add(i110);
-            _triangles.Add(i000); _triangles.Add(i110); _triangles.Add(i100);
+            AddDedupedQuad((xi,     yi,     zi),
+                           (xi,     yi + 1, zi),
+                           (xi + 1, yi + 1, zi),
+                           (xi + 1, yi,     zi),
+                           cubeSize);
         }
-        //back (+Z face)
         if (GetDistance(CenterPointAtIndices(xi, yi, zi + 1, cubeSize)) > 0) {
-            int i001 = GetOrAddVoxelCorner(xi, yi, zi + 1, cubeSize);
-            int i101 = GetOrAddVoxelCorner(xi + 1, yi, zi + 1, cubeSize);
-            int i111 = GetOrAddVoxelCorner(xi + 1, yi + 1, zi + 1, cubeSize);
-            int i011 = GetOrAddVoxelCorner(xi, yi + 1, zi + 1, cubeSize);
-            _triangles.Add(i001); _triangles.Add(i101); _triangles.Add(i111);
-            _triangles.Add(i001); _triangles.Add(i111); _triangles.Add(i011);
+            AddDedupedQuad((xi,     yi,     zi + 1),
+                           (xi + 1, yi,     zi + 1),
+                           (xi + 1, yi + 1, zi + 1),
+                           (xi,     yi + 1, zi + 1),
+                           cubeSize);
         }
+    }
+
+    private void AddDedupedQuad(
+            (int x, int y, int z) a, (int x, int y, int z) b,
+            (int x, int y, int z) c, (int x, int y, int z) d,
+            float cubeSize) {
+        int ia = GetOrAddVoxelCorner(a.x, a.y, a.z, cubeSize);
+        int ib = GetOrAddVoxelCorner(b.x, b.y, b.z, cubeSize);
+        int ic = GetOrAddVoxelCorner(c.x, c.y, c.z, cubeSize);
+        int id = GetOrAddVoxelCorner(d.x, d.y, d.z, cubeSize);
+        _triangles.Add(ia); _triangles.Add(ib); _triangles.Add(ic);
+        _triangles.Add(ia); _triangles.Add(ic); _triangles.Add(id);
     }
 
     private int GetOrAddVoxelCorner(int xi, int yi, int zi, float cubeSize) {
         long key = CornerKey(xi, yi, zi);
-        if (_cornerVertexCache.TryGetValue(key, out int idx)) return idx;
+        if (_cornerVertexCache.TryGetValue(key, out int idx)) { return idx; }
         int newIdx = _vertices.Count;
         _cornerVertexCache[key] = newIdx;
         _vertices.Add(PointAtIndices(xi, yi, zi, cubeSize));
@@ -355,6 +391,47 @@ public class MeshGenerator : MonoBehaviour {
     // coords ≤ 51, which fits comfortably in 21 bits per axis.
     private static long CornerKey(int x, int y, int z) =>
         ((long)x << 42) | ((long)y << 21) | (long)z;
+
+    // ─── Coordinate and mesh helpers ──────────────────────────────────────────
+
+    protected Vector3 PointAtIndices(int x, int y, int z, float cubeSize) {
+        return new Vector3(
+            x * cubeSize * (_bounds.max.x - _bounds.min.x) + _bounds.min.x,
+            y * cubeSize * (_bounds.max.y - _bounds.min.y) + _bounds.min.y,
+            z * cubeSize * (_bounds.max.z - _bounds.min.z) + _bounds.min.z
+        );
+    }
+
+    protected Vector3 CenterPointAtIndices(int x, int y, int z, float cubeSize) {
+        return new Vector3(
+            (x + 0.5f) * cubeSize * (_bounds.max.x - _bounds.min.x) + _bounds.min.x,
+            (y + 0.5f) * cubeSize * (_bounds.max.y - _bounds.min.y) + _bounds.min.y,
+            (z + 0.5f) * cubeSize * (_bounds.max.z - _bounds.min.z) + _bounds.min.z
+        );
+    }
+
+    protected void ProjectVerticesToSurface() {
+        for (int i = 0; i < _vertices.Count; i++) {
+            for (int j = 0; j < _projectionSteps; j++) {
+                var n = GetNormal(_vertices[i]);
+                _vertices[i] -= n * GetDistance(_vertices[i]) * _projectionAmount;
+            }
+        }
+    }
+
+    private void ApplyNormals(Mesh mesh) {
+        if (_getNormalsFromSDF) {
+            _normals.Clear();
+            for (int i = 0; i < _vertices.Count; i++) {
+                _normals.Add(GetNormal(_vertices[i]));
+            }
+            mesh.SetNormals(_normals);
+        } else {
+            mesh.RecalculateNormals();
+        }
+    }
+
+    // ─── SDF evaluation ───────────────────────────────────────────────────────
 
     protected float GetDistance(Vector3 p) {
         return _sdfScene.GetDistance(transform.TransformPoint(p));
@@ -375,86 +452,5 @@ public class MeshGenerator : MonoBehaviour {
         }
         float h = Math.Max(k - Math.Abs(a - b), 0.0f) / k;
         return Math.Min(a, b) - h * h * h * k * (1.0f / 6.0f);
-    }
-
-    protected void AddCube(List<Vector3> vertices, List<int> triangles, int xi, int yi, int zi, float cubeSize) {
-        int bits =
-                GetDistance(PointAtIndices(xi + 0, yi + 0, zi + 1, cubeSize)) < 0 ? (1 << 0) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 1, yi + 0, zi + 1, cubeSize)) < 0 ? (1 << 1) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 1, yi + 0, zi + 0, cubeSize)) < 0 ? (1 << 2) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 0, yi + 0, zi + 0, cubeSize)) < 0 ? (1 << 3) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 0, yi + 1, zi + 1, cubeSize)) < 0 ? (1 << 4) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 1, yi + 1, zi + 1, cubeSize)) < 0 ? (1 << 5) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 1, yi + 1, zi + 0, cubeSize)) < 0 ? (1 << 6) : 0;
-        bits |= GetDistance(PointAtIndices(xi + 0, yi + 1, zi + 0, cubeSize)) < 0 ? (1 << 7) : 0;
-        var origin = PointAtIndices(xi, yi, zi, cubeSize);
-        var cubeDim = (_bounds.max - _bounds.min) * cubeSize;
-
-        var tris = MarchTables.triangulation[~bits & 255];
-        foreach (var tri in tris) {
-            _triangles.Add(_vertices.Count);
-            var edgePoint = MarchTables.edgePoints[tri];
-            _vertices.Add(new Vector3(origin.x + edgePoint.x * cubeDim.x,
-                                      origin.y + edgePoint.y * cubeDim.y,
-                                      origin.z + edgePoint.z * cubeDim.z));
-        }
-    }
-
-    protected void AddVoxel(List<Vector3> vertices, List<int> triangles, int xi, int yi, int zi, float cubeSize) {
-        if (GetDistance(CenterPointAtIndices(xi, yi, zi, cubeSize)) > 0) return;
-
-        // Corners keyed by integer grid indices via PointAtIndices.
-        // Each corner is computed as: n * cubeSize * (max - min) + min
-        // Two adjacent voxels sharing a corner call PointAtIndices with the same integer n,
-        // so they take an identical arithmetic path and get bit-identical floats.
-        // This makes Dictionary<Vector3, int> dedup safe (no float-equality ambiguity).
-        Vector3 p000 = PointAtIndices(xi, yi, zi, cubeSize);
-        Vector3 p100 = PointAtIndices(xi + 1, yi, zi, cubeSize);
-        Vector3 p010 = PointAtIndices(xi, yi + 1, zi, cubeSize);
-        Vector3 p110 = PointAtIndices(xi + 1, yi + 1, zi, cubeSize);
-        Vector3 p001 = PointAtIndices(xi, yi, zi + 1, cubeSize);
-        Vector3 p101 = PointAtIndices(xi + 1, yi, zi + 1, cubeSize);
-        Vector3 p011 = PointAtIndices(xi, yi + 1, zi + 1, cubeSize);
-        Vector3 p111 = PointAtIndices(xi + 1, yi + 1, zi + 1, cubeSize);
-
-        //below (-Y face)
-        if (GetDistance(CenterPointAtIndices(xi, yi - 1, zi, cubeSize)) > 0) {
-            vertices.Add(p000); vertices.Add(p100); vertices.Add(p101); vertices.Add(p001);
-            AddQuadIndices(triangles, vertices.Count);
-        }
-        //above (+Y face)
-        if (GetDistance(CenterPointAtIndices(xi, yi + 1, zi, cubeSize)) > 0) {
-            vertices.Add(p010); vertices.Add(p011); vertices.Add(p111); vertices.Add(p110);
-            AddQuadIndices(triangles, vertices.Count);
-        }
-        //left (-X face)
-        if (GetDistance(CenterPointAtIndices(xi - 1, yi, zi, cubeSize)) > 0) {
-            vertices.Add(p000); vertices.Add(p001); vertices.Add(p011); vertices.Add(p010);
-            AddQuadIndices(triangles, vertices.Count);
-        }
-        //right (+X face)
-        if (GetDistance(CenterPointAtIndices(xi + 1, yi, zi, cubeSize)) > 0) {
-            vertices.Add(p100); vertices.Add(p110); vertices.Add(p111); vertices.Add(p101);
-            AddQuadIndices(triangles, vertices.Count);
-        }
-        //front (-Z face)
-        if (GetDistance(CenterPointAtIndices(xi, yi, zi - 1, cubeSize)) > 0) {
-            vertices.Add(p000); vertices.Add(p010); vertices.Add(p110); vertices.Add(p100);
-            AddQuadIndices(triangles, vertices.Count);
-        }
-        //back (+Z face)
-        if (GetDistance(CenterPointAtIndices(xi, yi, zi + 1, cubeSize)) > 0) {
-            vertices.Add(p001); vertices.Add(p101); vertices.Add(p111); vertices.Add(p011);
-            AddQuadIndices(triangles, vertices.Count);
-        }
-    }
-
-    protected void AddQuadIndices(List<int> triangles, int endIndex) {
-        triangles.Add(endIndex - 4);
-        triangles.Add(endIndex - 3);
-        triangles.Add(endIndex - 2);
-        triangles.Add(endIndex - 4);
-        triangles.Add(endIndex - 2);
-        triangles.Add(endIndex - 1);
     }
 }

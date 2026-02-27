@@ -26,10 +26,12 @@ public class RayMarchMaterialEditor : ShaderGUI {
             if (EditorGUI.EndChangeCheck())
                 p.floatValue = Mathf.Clamp(newVal, min, max);
         }
+        // --- Material ---
         Draw("_Tint");
         Draw("_MainTex");
         Draw("_Metallic");
         Draw("_Smoothness");
+        EditorGUILayout.Space();
 
         // --- Ray March ---
         EditorGUILayout.LabelField("Ray March", EditorStyles.boldLabel);
@@ -38,18 +40,17 @@ public class RayMarchMaterialEditor : ShaderGUI {
         DrawLog("_SurfDist", 1e-7f, 0.1f);
         DrawLog("_NormalDist", 1e-7f, 0.1f);
         Draw("_StepFactor");
-
         EditorGUILayout.Space();
 
         // --- SDF ---
         EditorGUILayout.LabelField("SDF", EditorStyles.boldLabel);
         Draw("_PrimitiveAlbedoMode");
-
         EditorGUILayout.Space();
 
         // --- Backface Culling ---
         EditorGUILayout.LabelField("Backface Culling", EditorStyles.boldLabel);
         editor.ShaderProperty(backfaceMode, backfaceMode.displayName);
+        EditorGUILayout.Space();
 
         int modeIndex = (int)backfaceMode.floatValue;
         if (modeIndex == 1) // Alpha

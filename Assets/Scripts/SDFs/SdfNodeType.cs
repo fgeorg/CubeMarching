@@ -1,8 +1,6 @@
 // SDF node type IDs.
 // HLSL mirror: Assets/Shaders/SdfNodeTypes.hlsl (#define SDF_* values must match).
-// GPU-only smooth variants (11, 14, 15) are NOT in this enum; they are emitted by
-// SdfScene.MakeOp when smoothK > 0, and are also declared as const int in SdfScene.cs.
-// Keep all three files in sync when adding new types.
+// Keep both files in sync when adding new types.
 
 // Primitives directly correspond to an SDF equation
 public enum SdfNodeType {
