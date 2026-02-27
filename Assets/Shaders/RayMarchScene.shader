@@ -156,11 +156,11 @@ Shader "RayMarchScene"
                 col.a = _Tint.a;
 
                 float ndotv = dot(normalWS, rd);
-                #if defined(_BACKFACECULLMODE_DISCARD)
-                    if (ndotv > _BackfaceCullThreshold) discard;
-                #elif defined(_BACKFACECULLMODE_ALPHA)
-                    col.a *= 1 - smoothstep(_BackfaceCullMin, _BackfaceCullMax, ndotv);
-                #endif
+#if defined(_BACKFACECULLMODE_DISCARD)
+                if (ndotv > _BackfaceCullThreshold) discard;
+#elif defined(_BACKFACECULLMODE_ALPHA)
+                col.a *= 1 - smoothstep(_BackfaceCullMin, _BackfaceCullMax, ndotv);
+#endif
 
                 color = saturate(col);
                 depth = clipSpacePos.z / clipSpacePos.w;

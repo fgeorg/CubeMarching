@@ -35,12 +35,12 @@ float GetDistanceToScene(float3 p)
         SdfNode node = _SdfNodes[i];
         int t = (int)node.typeAndParams.x;
         float k = node.typeAndParams.y;
-        if (t < SDF_UNION) // primitive — push
+        if (t < SDF_PRIMITIVES_END) // primitive — push
         {
             float3 lp = mul(node.transform, float4(p, 1.0)).xyz;
             float d;
             if (t == SDF_SPHERE)
-                d = length(lp) - node.typeAndParams.y;
+            d = length(lp) - node.typeAndParams.y;
             else if (t == SDF_BOX)
             {
                 float3 bh = node.typeAndParams.yzw;
@@ -58,16 +58,7 @@ float GetDistanceToScene(float3 p)
                 sp++;
             }
         }
-        else if (t >= SDF_SHELL) // unary modifier — modify top in place
-        {
-            if (sp >= 1)
-            {
-                float top = GetStackValue(stack, sp - 1);
-                if (t == SDF_SHELL) SetStackValue(stack, sp - 1, abs(top) - k);
-                else                SetStackValue(stack, sp - 1, top - k); // SDF_EXPAND
-            }
-        }
-        else if (sp >= 2) // binary operator — pop two, push result
+        else if (t <= SDF_UNARY_OPS_END && sp >= 2) // binary operator — pop two, push result
         {
             sp--;
             float b = GetStackValue(stack, sp);
@@ -82,6 +73,12 @@ float GetDistanceToScene(float3 p)
             else                                r = SmoothSubtract(a, b, k); // SDF_SMOOTH_SUBTRACT
             SetStackValue(stack, sp, r);
             sp++;
+        }
+        else if (t <= SDF_UNARY_OPS_END && sp >= 1) // unary modifier — modify top in place
+        {
+            float top = GetStackValue(stack, sp - 1);
+            if (t == SDF_SHELL) SetStackValue(stack, sp - 1, abs(top) - k);
+            else                SetStackValue(stack, sp - 1, top - k); // SDF_EXPAND
         }
     }
     return sp > 0 ? GetStackValue(stack, 0) : 1e10;

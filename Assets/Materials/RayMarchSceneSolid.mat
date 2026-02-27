@@ -104,7 +104,7 @@ Material:
     - _GlossyReflections: 0
     - _MarchMode: 0
     - _MaxDist: 100
-    - _MaxSteps: 200
+    - _MaxSteps: 40
     - _Metallic: 0
     - _NormalDist: 0.00001
     - _OcclusionStrength: 1
