@@ -4,8 +4,7 @@
 // Metal does not support dynamic indexing into temporary arrays (e.g. float stack[8]; stack[i]),
 // so the stack is stored as named scalar fields with switch-based accessors to work around this.
 #define STACK_SIZE 8
-struct SdfStack
-{
+struct SdfStack {
     float s0;
     float s1;
     float s2;
@@ -16,10 +15,8 @@ struct SdfStack
     float s7;
 };
 
-void SetStackValue(inout SdfStack stack, int index, float val)
-{
-    switch(index)
-    {
+void SetStackValue(inout SdfStack stack, int index, float val) {
+    switch(index) {
         case 0: stack.s0 = val; break;
         case 1: stack.s1 = val; break;
         case 2: stack.s2 = val; break;
@@ -31,10 +28,8 @@ void SetStackValue(inout SdfStack stack, int index, float val)
     }
 }
 
-float GetStackValue(SdfStack stack, int index)
-{
-    switch(index)
-    {
+float GetStackValue(SdfStack stack, int index) {
+    switch(index) {
         case 0: return stack.s0;
         case 1: return stack.s1;
         case 2: return stack.s2;

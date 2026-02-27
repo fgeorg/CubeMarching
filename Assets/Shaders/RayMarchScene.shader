@@ -1,7 +1,5 @@
-Shader "RayMarchScene"
-{
-    Properties
-    {
+Shader "RayMarchScene" {
+    Properties {
         _MainTex ("Texture", 2D) = "white" {}
         _Tint ("Tint", Color) = (1, 1, 1, 1)
         _Metallic ("Metallic", Range(0, 1)) = 0.0
@@ -18,14 +16,12 @@ Shader "RayMarchScene"
         _BackfaceCullThreshold ("Backface Cull Threshold", Range(0.0, 1.0)) = 0.0
         [HideInInspector] _SdfNodeCount ("SdfNodeCount", Int) = 0
     }
-    SubShader
-    {
+    SubShader {
         Tags { "RenderType"="Transparent" "RenderPipeline"="UniversalRenderPipeline" "Queue"="Transparent" }
         LOD 100
         Blend SrcAlpha OneMinusSrcAlpha
 
-        Pass
-        {
+        Pass {
             Name "UniversalForward"
             Tags { "LightMode"="UniversalForward" }
 
@@ -44,15 +40,13 @@ Shader "RayMarchScene"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "SdfLighting.hlsl"
 
-            struct appdata
-            {
+            struct appdata {
                 float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
-            struct v2f
-            {
+            struct v2f {
                 float4 vertex : SV_POSITION;
                 float3 ro : TEXCOORD0;
                 float3 hitPos : TEXCOORD1;
@@ -80,8 +74,7 @@ Shader "RayMarchScene"
 
             #include "SdfSceneDistanceGpu.hlsl"
 
-            v2f vert(appdata v)
-            {
+            v2f vert(appdata v) {
                 v2f o;
                 UNITY_SETUP_INSTANCE_ID(v);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
@@ -91,8 +84,7 @@ Shader "RayMarchScene"
                 return o;
             }
 
-            float3 GetNormal(float3 p)
-            {
+            float3 GetNormal(float3 p) {
                 float2 e = float2(_NormalDist, 0);
                 float3 n = float3(
                 GetDistanceToScene(p + e.xyy),
@@ -102,12 +94,10 @@ Shader "RayMarchScene"
                 return normalize(n);
             }
 
-            float RayMarch(float3 ro, float3 rd)
-            {
+            float RayMarch(float3 ro, float3 rd) {
                 float dO = 0;
                 [loop]
-                for (int i = 0; i < _MaxSteps; i++)
-                {
+                for (int i = 0; i < _MaxSteps; i++) {
                     float3 p = ro + dO * rd;
                     float dS = GetDistanceToScene(p);
                     if (dS < _SurfDist || dO > _MaxDist) break;
@@ -116,12 +106,10 @@ Shader "RayMarchScene"
                 return dO;
             }
 
-            void frag(v2f i, out float4 color : SV_Target, out float depth : SV_Depth)
-            {
+            void frag(v2f i, out float4 color : SV_Target, out float depth : SV_Depth) {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
-                if (_SdfNodeCount <= 0)
-                {
+                if (_SdfNodeCount <= 0) {
                     color = 0;
                     depth = 0;
                     discard;
@@ -133,8 +121,7 @@ Shader "RayMarchScene"
                 float d = RayMarch(ro, rd);
                 float4 col;
 
-                if (d > _MaxDist)
-                {
+                if (d > _MaxDist) {
                     col.a = 0;
                     discard;
                 }
@@ -162,7 +149,7 @@ Shader "RayMarchScene"
 #endif
 
                 color = saturate(col);
-                // convert to normalized device coordinates to get the depth    
+                // convert to normalized device coordinates to get the depth
                 depth = clipSpacePos.z / clipSpacePos.w;
             }
             ENDHLSL
