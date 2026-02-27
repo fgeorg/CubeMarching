@@ -122,7 +122,7 @@ public class MeshGenerator : MonoBehaviour {
                             AddCube(_vertices, _triangles, x, y, z, cubeSize);
                             break;
                         case EAlgorithm.Minecraft:
-                            AddVoxel(_vertices, _triangles, x, y, z, cubeSize);
+                            AddVoxel(x, y, z, cubeSize);
                             break;
                     }
                     float percentDone = (float)(x * _resolution * _resolution + y * _resolution + z)
@@ -208,47 +208,68 @@ public class MeshGenerator : MonoBehaviour {
         }
     }
 
-    protected void AddVoxel(List<Vector3> vertices, List<int> triangles, int xi, int yi, int zi, float cubeSize) {
+    protected void AddVoxel(int xi, int yi, int zi, float cubeSize) {
         if (GetDistance(CenterPointAtIndices(xi, yi, zi, cubeSize)) > 0) { return; }
 
-        // Corners keyed by integer grid indices via PointAtIndices.
-        // Each corner is computed as: n * cubeSize * (max - min) + min
-        // Two adjacent voxels sharing a corner call PointAtIndices with the same integer n,
-        // so they take an identical arithmetic path and get bit-identical floats.
-        // This makes Dictionary<Vector3, int> dedup safe (no float-equality ambiguity).
-        Vector3 p000 = PointAtIndices(xi, yi, zi, cubeSize);
-        Vector3 p100 = PointAtIndices(xi + 1, yi, zi, cubeSize);
-        Vector3 p010 = PointAtIndices(xi, yi + 1, zi, cubeSize);
-        Vector3 p110 = PointAtIndices(xi + 1, yi + 1, zi, cubeSize);
-        Vector3 p001 = PointAtIndices(xi, yi, zi + 1, cubeSize);
-        Vector3 p101 = PointAtIndices(xi + 1, yi, zi + 1, cubeSize);
-        Vector3 p011 = PointAtIndices(xi, yi + 1, zi + 1, cubeSize);
-        Vector3 p111 = PointAtIndices(xi + 1, yi + 1, zi + 1, cubeSize);
-
+        // Bottom face
         if (GetDistance(CenterPointAtIndices(xi, yi - 1, zi, cubeSize)) > 0) {
-            vertices.Add(p000); vertices.Add(p100); vertices.Add(p101); vertices.Add(p001);
-            AddQuadIndices(triangles, vertices.Count);
+            AddQuad((xi, yi, zi),
+                    (xi + 1, yi, zi),
+                    (xi + 1, yi, zi + 1),
+                    (xi, yi, zi + 1),
+                    cubeSize);
         }
+        // Top face
         if (GetDistance(CenterPointAtIndices(xi, yi + 1, zi, cubeSize)) > 0) {
-            vertices.Add(p010); vertices.Add(p011); vertices.Add(p111); vertices.Add(p110);
-            AddQuadIndices(triangles, vertices.Count);
+            AddQuad((xi, yi + 1, zi),
+                    (xi, yi + 1, zi + 1),
+                    (xi + 1, yi + 1, zi + 1),
+                    (xi + 1, yi + 1, zi),
+                    cubeSize);
         }
+        // Left face
         if (GetDistance(CenterPointAtIndices(xi - 1, yi, zi, cubeSize)) > 0) {
-            vertices.Add(p000); vertices.Add(p001); vertices.Add(p011); vertices.Add(p010);
-            AddQuadIndices(triangles, vertices.Count);
+            AddQuad((xi, yi, zi),
+                    (xi, yi, zi + 1),
+                    (xi, yi + 1, zi + 1),
+                    (xi, yi + 1, zi),
+                    cubeSize);
         }
+        // Right face
         if (GetDistance(CenterPointAtIndices(xi + 1, yi, zi, cubeSize)) > 0) {
-            vertices.Add(p100); vertices.Add(p110); vertices.Add(p111); vertices.Add(p101);
-            AddQuadIndices(triangles, vertices.Count);
+            AddQuad((xi + 1, yi, zi),
+                    (xi + 1, yi + 1, zi),
+                    (xi + 1, yi + 1, zi + 1),
+                    (xi + 1, yi, zi + 1),
+                    cubeSize);
         }
+        // Front face
         if (GetDistance(CenterPointAtIndices(xi, yi, zi - 1, cubeSize)) > 0) {
-            vertices.Add(p000); vertices.Add(p010); vertices.Add(p110); vertices.Add(p100);
-            AddQuadIndices(triangles, vertices.Count);
+            AddQuad((xi, yi, zi),
+                    (xi, yi + 1, zi),
+                    (xi + 1, yi + 1, zi),
+                    (xi + 1, yi, zi),
+                    cubeSize);
         }
+        // Back face
         if (GetDistance(CenterPointAtIndices(xi, yi, zi + 1, cubeSize)) > 0) {
-            vertices.Add(p001); vertices.Add(p101); vertices.Add(p111); vertices.Add(p011);
-            AddQuadIndices(triangles, vertices.Count);
+            AddQuad((xi, yi, zi + 1),
+                    (xi + 1, yi, zi + 1),
+                    (xi + 1, yi + 1, zi + 1),
+                    (xi, yi + 1, zi + 1),
+                    cubeSize);
         }
+    }
+
+    protected void AddQuad(
+            (int x, int y, int z) a, (int x, int y, int z) b,
+            (int x, int y, int z) c, (int x, int y, int z) d,
+            float cubeSize) {
+        _vertices.Add(PointAtIndices(a.x, a.y, a.z, cubeSize));
+        _vertices.Add(PointAtIndices(b.x, b.y, b.z, cubeSize));
+        _vertices.Add(PointAtIndices(c.x, c.y, c.z, cubeSize));
+        _vertices.Add(PointAtIndices(d.x, d.y, d.z, cubeSize));
+        AddQuadIndices(_triangles, _vertices.Count);
     }
 
     protected void AddQuadIndices(List<int> triangles, int endIndex) {
@@ -322,46 +343,52 @@ public class MeshGenerator : MonoBehaviour {
     private void AddVoxelWithCornerDedup(int xi, int yi, int zi, float cubeSize) {
         if (GetDistance(CenterPointAtIndices(xi, yi, zi, cubeSize)) > 0) { return; }
 
+        // Bottom face
         if (GetDistance(CenterPointAtIndices(xi, yi - 1, zi, cubeSize)) > 0) {
-            AddDedupedQuad((xi,     yi, zi),
+            AddDedupedQuad((xi, yi, zi),
                            (xi + 1, yi, zi),
                            (xi + 1, yi, zi + 1),
-                           (xi,     yi, zi + 1),
+                           (xi, yi, zi + 1),
                            cubeSize);
         }
+        // Top face
         if (GetDistance(CenterPointAtIndices(xi, yi + 1, zi, cubeSize)) > 0) {
-            AddDedupedQuad((xi,     yi + 1, zi),
-                           (xi,     yi + 1, zi + 1),
+            AddDedupedQuad((xi, yi + 1, zi),
+                           (xi, yi + 1, zi + 1),
                            (xi + 1, yi + 1, zi + 1),
                            (xi + 1, yi + 1, zi),
                            cubeSize);
         }
+        // Left face
         if (GetDistance(CenterPointAtIndices(xi - 1, yi, zi, cubeSize)) > 0) {
-            AddDedupedQuad((xi, yi,     zi),
-                           (xi, yi,     zi + 1),
+            AddDedupedQuad((xi, yi, zi),
+                           (xi, yi, zi + 1),
                            (xi, yi + 1, zi + 1),
                            (xi, yi + 1, zi),
                            cubeSize);
         }
+        // Right face
         if (GetDistance(CenterPointAtIndices(xi + 1, yi, zi, cubeSize)) > 0) {
-            AddDedupedQuad((xi + 1, yi,     zi),
+            AddDedupedQuad((xi + 1, yi, zi),
                            (xi + 1, yi + 1, zi),
                            (xi + 1, yi + 1, zi + 1),
-                           (xi + 1, yi,     zi + 1),
+                           (xi + 1, yi, zi + 1),
                            cubeSize);
         }
+        // Front face
         if (GetDistance(CenterPointAtIndices(xi, yi, zi - 1, cubeSize)) > 0) {
-            AddDedupedQuad((xi,     yi,     zi),
-                           (xi,     yi + 1, zi),
+            AddDedupedQuad((xi, yi, zi),
+                           (xi, yi + 1, zi),
                            (xi + 1, yi + 1, zi),
-                           (xi + 1, yi,     zi),
+                           (xi + 1, yi, zi),
                            cubeSize);
         }
+        // Back face
         if (GetDistance(CenterPointAtIndices(xi, yi, zi + 1, cubeSize)) > 0) {
-            AddDedupedQuad((xi,     yi,     zi + 1),
-                           (xi + 1, yi,     zi + 1),
+            AddDedupedQuad((xi, yi, zi + 1),
+                           (xi + 1, yi, zi + 1),
                            (xi + 1, yi + 1, zi + 1),
-                           (xi,     yi + 1, zi + 1),
+                           (xi, yi + 1, zi + 1),
                            cubeSize);
         }
     }
