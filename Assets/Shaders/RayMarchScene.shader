@@ -3,7 +3,6 @@ Shader "RayMarchScene"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
-        _SMinKValue ("SMinKValue", Range(0,8)) = 0.3
         [IntRange] _MaxSteps ("Max Steps", Range(1, 200)) = 50
         _MaxDist ("Max Dist", Range(1, 1000)) = 100
         _SurfDist ("Surf Dist", Range(0.00001, 0.1)) = 0.001
@@ -11,6 +10,10 @@ Shader "RayMarchScene"
         _StepFactor ("Step Factor", Range(0.5, 1.0)) = 1.0
         _Metallic ("Metallic", Range(0, 1)) = 0.0
         _Smoothness ("Smoothness", Range(0, 1)) = 0.5
+        [KeywordEnum(Disabled, Alpha, Discard)] _BackfaceCullMode ("Backface Cull Mode", Float) = 1
+        _BackfaceCullMin ("Backface Cull Min", Range(0, 1.0)) = 0.1
+        _BackfaceCullMax ("Backface Cull Max", Range(0, 1.0)) = 0.5
+        _BackfaceCullThreshold ("Backface Cull Threshold", Range(0.0, 1.0)) = 0.0
         [HideInInspector] _SdfNodeCount ("SdfNodeCount", Int) = 0
     }
     SubShader
@@ -33,6 +36,7 @@ Shader "RayMarchScene"
             #pragma shader_feature_local _ _MIXED_LIGHTING_SUBTRACTIVE
             #pragma shader_feature _ PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
             #pragma multi_compile_instancing
+            #pragma shader_feature_local _BACKFACECULLMODE_DISABLED _BACKFACECULLMODE_ALPHA _BACKFACECULLMODE_DISCARD
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -60,13 +64,15 @@ Shader "RayMarchScene"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
-                float _SMinKValue;
                 float _MaxDist;
                 float _SurfDist;
                 float _NormalDist;
                 float _StepFactor;
                 float _Metallic;
                 float _Smoothness;
+                float _BackfaceCullMin;
+                float _BackfaceCullMax;
+                float _BackfaceCullThreshold;
                 int _MaxSteps;
                 int _SdfNodeCount;
             CBUFFER_END
@@ -106,7 +112,7 @@ Shader "RayMarchScene"
                 SdfStack stack = (SdfStack)0;
                 int sp = 0;
                 [loop]
-                for (int i = 0; i < min(_SdfNodeCount, 64); i++)
+                for (int i = 0; i < _SdfNodeCount; i++)
                 {
                     SdfNode node = _SdfNodes[i];
                     int t = (int)node.typeAndParams.x;
@@ -116,7 +122,7 @@ Shader "RayMarchScene"
                         float3 lp = mul(node.transform, float4(p, 1.0)).xyz;
                         float d;
                         if (t == SDF_SPHERE)
-                            d = length(lp) - node.typeAndParams.y;
+                        d = length(lp) - node.typeAndParams.y;
                         else if (t == SDF_BOX)
                         {
                             float3 bh = node.typeAndParams.yzw;
@@ -140,7 +146,7 @@ Shader "RayMarchScene"
                         {
                             float top = GetStackValue(stack, sp - 1);
                             if (t == SDF_SHELL) SetStackValue(stack, sp - 1, abs(top) - k);
-                            else                SetStackValue(stack, sp - 1, top + k); // SDF_EXPAND
+                            else                SetStackValue(stack, sp - 1, top - k); // SDF_EXPAND
                         }
                     }
                     else if (sp >= 2) // binary operator — pop two, push result
@@ -167,9 +173,9 @@ Shader "RayMarchScene"
             {
                 float2 e = float2(_NormalDist, 0);
                 float3 n = float3(
-                    EvalScene(p + e.xyy),
-                    EvalScene(p + e.yxy),
-                    EvalScene(p + e.yyx)
+                EvalScene(p + e.xyy),
+                EvalScene(p + e.yxy),
+                EvalScene(p + e.yyx)
                 ) - EvalScene(p);
                 return normalize(n);
             }
@@ -226,10 +232,18 @@ Shader "RayMarchScene"
 
                 col.rgb = SDFLighting(p, normalWS, clipSpacePos, surfaceData);
 
+                float ndotv = dot(normalWS, rd);
+                #if defined(_BACKFACECULLMODE_DISCARD)
+                    if (ndotv > _BackfaceCullThreshold) discard;
+                #elif defined(_BACKFACECULLMODE_ALPHA)
+                    col.a = 1 - smoothstep(_BackfaceCullMin, _BackfaceCullMax, ndotv);
+                #endif
+
                 color = saturate(col);
                 depth = clipSpacePos.z / clipSpacePos.w;
             }
             ENDHLSL
         }
     }
+    CustomEditor "RayMarchMaterialEditor"
 }

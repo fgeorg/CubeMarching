@@ -3,7 +3,6 @@ using UnityEngine;
 
 public class RayMarchMaterialEditor : ShaderGUI {
     public override void OnGUI(MaterialEditor editor, MaterialProperty[] properties) {
-        var marchMode = FindProperty("_MarchMode", properties);
         var backfaceMode = FindProperty("_BackfaceCullMode", properties);
 
         void Draw(string name) {
@@ -30,23 +29,16 @@ public class RayMarchMaterialEditor : ShaderGUI {
 
         // --- Ray March ---
         EditorGUILayout.LabelField("Ray March", EditorStyles.boldLabel);
-        editor.ShaderProperty(marchMode, marchMode.displayName);
         Draw("_MaxSteps");
         Draw("_MaxDist");
         DrawLog("_SurfDist", 1e-7f, 0.1f);
         DrawLog("_NormalDist", 1e-7f, 0.1f);
         Draw("_StepFactor");
 
-        int marchModeIndex = (int)marchMode.floatValue;
-        if (marchModeIndex == 1) Draw("_Omega");        // Enhanced
-        else if (marchModeIndex == 2) Draw("_CoarseThresh"); // Secant
-        else if (marchModeIndex == 3) Draw("_OvershootEps"); // Binary
-
         EditorGUILayout.Space();
 
         // --- SDF ---
         EditorGUILayout.LabelField("SDF", EditorStyles.boldLabel);
-        Draw("_SMinKValue");
 
         EditorGUILayout.Space();
 
