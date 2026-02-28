@@ -42,11 +42,6 @@ public class RayMarchMaterialEditor : ShaderGUI {
         Draw("_StepFactor");
         EditorGUILayout.Space();
 
-        // --- SDF ---
-        EditorGUILayout.LabelField("SDF", EditorStyles.boldLabel);
-        Draw("_PrimitiveAlbedoMode");
-        EditorGUILayout.Space();
-
         // --- Backface Culling ---
         EditorGUILayout.LabelField("Backface Culling", EditorStyles.boldLabel);
         editor.ShaderProperty(backfaceMode, backfaceMode.displayName);
