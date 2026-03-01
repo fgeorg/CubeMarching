@@ -15,9 +15,9 @@
 #define SDF_BINARY_OPS_START 10
 
 #define SDF_UNION            10
-#define SDF_SMOOTH_UNION     11
-#define SDF_INTERSECT        12
-#define SDF_SUBTRACT         13
+#define SDF_INTERSECT        11
+#define SDF_SUBTRACT         12
+#define SDF_SMOOTH_UNION     13
 #define SDF_SMOOTH_INTERSECT 14
 #define SDF_SMOOTH_SUBTRACT  15
 

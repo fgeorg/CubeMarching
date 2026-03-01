@@ -3,12 +3,22 @@ using UnityEngine;
 
 [CustomEditor(typeof(SdfNodeComponent))]
 public class SdfNodeComponentEditor : Editor {
+    static readonly string[] s_TypeNames;
+    static readonly int[] s_TypeValues;
+
+    static SdfNodeComponentEditor() {
+        var allTypes = (SdfNodeType[])System.Enum.GetValues(typeof(SdfNodeType));
+        var editableTypes = System.Array.FindAll(allTypes, t => !t.ToString().StartsWith("Smooth"));
+        s_TypeNames  = System.Array.ConvertAll(editableTypes, t => t.ToString());
+        s_TypeValues = System.Array.ConvertAll(editableTypes, t => (int)t);
+    }
+
     public override void OnInspectorGUI() {
         serializedObject.Update();
 
         var typeProp = serializedObject.FindProperty("nodeType");
         EditorGUI.BeginChangeCheck();
-        EditorGUILayout.PropertyField(typeProp, new GUIContent("Type"));
+        typeProp.intValue = EditorGUILayout.IntPopup("Type", typeProp.intValue, s_TypeNames, s_TypeValues);
         bool typeChanged = EditorGUI.EndChangeCheck();
 
         if (typeChanged) {

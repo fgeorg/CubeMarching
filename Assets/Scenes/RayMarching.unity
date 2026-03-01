@@ -156,116 +156,6 @@ Transform:
   - {fileID: 884071956}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &263359156
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 263359157}
-  - component: {fileID: 263359158}
-  m_Layer: 0
-  m_Name: Sphere
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &263359157
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 263359156}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.403, y: 1.722, z: 0.24}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1327536919}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &263359158
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 263359156}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
-  nodeType: 0
-  color: {r: 0.7169812, g: 0.27394092, b: 0.27394092, a: 1}
-  metallic: 0.746
-  smoothness: 0.57
-  sphereRadius: 0.5
-  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
-  torusMajorRadius: 0.4
-  torusMinorRadius: 0.15
-  smoothK: 0
-  shellThickness: 0.05
-  expandAmount: 0.01
---- !u!1 &278889088
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 278889089}
-  - component: {fileID: 278889090}
-  m_Layer: 0
-  m_Name: Box
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &278889089
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 278889088}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.356, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1327536919}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &278889090
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 278889088}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
-  nodeType: 1
-  color: {r: 1, g: 1, b: 1, a: 1}
-  metallic: 0.225
-  smoothness: 0
-  sphereRadius: 0.5
-  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
-  torusMajorRadius: 0.4
-  torusMinorRadius: 0.15
-  smoothK: 0
-  shellThickness: 0.05
-  expandAmount: 0.01
 --- !u!1 &450753637
 GameObject:
   m_ObjectHideFlags: 0
@@ -530,76 +420,17 @@ Transform:
   - {fileID: 5886844021290701701}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1194525267
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1194525270}
-  - component: {fileID: 1194525269}
-  - component: {fileID: 1194525268}
-  m_Layer: 0
-  m_Name: SDF Scene
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1194525268
+--- !u!114 &1194525269 stripped
 MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
+  m_CorrespondingSourceObject: {fileID: 1602739888200145039, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+  m_PrefabInstance: {fileID: 1607531136945019115}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1194525267}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
-  nodeType: 10
-  color: {r: 1, g: 1, b: 1, a: 1}
-  metallic: 0
-  smoothness: 0.5
-  sphereRadius: 0.5
-  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
-  torusMajorRadius: 0.4
-  torusMinorRadius: 0.15
-  smoothK: 0.098
-  shellThickness: 0.05
-  expandAmount: 0.01
---- !u!114 &1194525269
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1194525267}
+  m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e9d73ee2ea32d4eeabf356f0abe0ead6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SdfScene
---- !u!4 &1194525270
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1194525267}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.595, y: -0.142, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1327536919}
-  - {fileID: 1735639796}
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1263431981
 GameObject:
   m_ObjectHideFlags: 0
@@ -754,63 +585,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1327536918
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1327536919}
-  - component: {fileID: 1327536920}
-  m_Layer: 0
-  m_Name: Subtract
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1327536919
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1327536918}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.184, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 278889089}
-  - {fileID: 263359157}
-  m_Father: {fileID: 1194525270}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1327536920
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1327536918}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
-  nodeType: 13
-  color: {r: 1, g: 1, b: 1, a: 1}
-  metallic: 0
-  smoothness: 0.5
-  sphereRadius: 0.5
-  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
-  torusMajorRadius: 0.4
-  torusMinorRadius: 0.15
-  smoothK: 0.071
-  shellThickness: 0.05
-  expandAmount: 0.01
 --- !u!1 &1522427159
 GameObject:
   m_ObjectHideFlags: 1
@@ -842,61 +616,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1735639795
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1735639796}
-  - component: {fileID: 1735639797}
-  m_Layer: 0
-  m_Name: Torus
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1735639796
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1735639795}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0.565, y: 1.455, z: -0.227}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1194525270}
-  m_LocalEulerAnglesHint: {x: -90, y: 0, z: 0}
---- !u!114 &1735639797
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1735639795}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: faae035f776204b3d987e7f64a95717a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
-  nodeType: 2
-  color: {r: 0.74461555, g: 0.5058824, b: 1, a: 1}
-  metallic: 0.037
-  smoothness: 0.652
-  sphereRadius: 0.5
-  boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
-  torusMajorRadius: 0.4
-  torusMinorRadius: 0.15
-  smoothK: 0
-  shellThickness: 0.05
-  expandAmount: 0.01
 --- !u!1 &119734848978804391
 GameObject:
   m_ObjectHideFlags: 0
@@ -1310,6 +1029,63 @@ MonoBehaviour:
   blendDistance: 0
   weight: 1
   sharedProfile: {fileID: 11400000, guid: 8141ade2731424c6d8efab4d83b68bc6, type: 2}
+--- !u!1001 &1607531136945019115
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 4852199094980303455, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4852199094980303455, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4852199094980303455, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4852199094980303455, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4852199094980303455, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4852199094980303455, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4852199094980303455, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4852199094980303455, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4852199094980303455, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4852199094980303455, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5554647025326197381, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
+      propertyPath: m_Name
+      value: SDF Scene
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 9ccdaec86ec3c438eb6fa010f9c6c508, type: 3}
 --- !u!1 &1659505970839723442
 GameObject:
   m_ObjectHideFlags: 0
@@ -3424,4 +3200,4 @@ SceneRoots:
   - {fileID: 1522427161}
   - {fileID: 1276148452}
   - {fileID: 1263431985}
-  - {fileID: 1194525270}
+  - {fileID: 1607531136945019115}

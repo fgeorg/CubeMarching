@@ -10,9 +10,9 @@ public enum SdfNodeType {
 
     // Binary operators act on two values
     Union = 10,
-    SmoothUnion = 11,
-    Intersect = 12,
-    Subtract = 13,
+    Intersect = 11,
+    Subtract = 12,
+    SmoothUnion = 13,
     SmoothIntersect = 14,
     SmoothSubtract = 15,
 
