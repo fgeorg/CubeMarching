@@ -16,7 +16,8 @@ public class SdfScene : MonoBehaviour {
     public struct BakedSdfPrimitive {
         // worldToLocal
         public Matrix4x4 transform;
-        public Vector4 albedo;
+        public Vector4 color;               // rgba
+        public Vector4 material;            // x=metallic, y=smoothness
     }
 
     private SdfNodeComponent _rootNode;
@@ -83,7 +84,8 @@ public class SdfScene : MonoBehaviour {
             int primIdx = _primitives.Count;
             _primitives.Add(new BakedSdfPrimitive {
                 transform = node.transform.worldToLocalMatrix,
-                albedo = (Vector4)node.albedo,
+                color    = (Vector4)node.color,
+                material = new Vector4(node.metallic, node.smoothness, 0, 0),
             });
             _nodes.Add(MakePrimitive(node, primIdx));
             _primitiveTransforms.Add(node.transform);

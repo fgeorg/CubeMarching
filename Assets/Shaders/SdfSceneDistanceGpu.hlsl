@@ -13,7 +13,8 @@ StructuredBuffer<SdfNode> _SdfNodes;
 
 struct SdfPrimitive {
     float4x4 transform; // worldToLocal
-    float4 albedo;
+    float4 color;       // rgba
+    float4 material;    // x=metallic, y=smoothness
 };
 StructuredBuffer<SdfPrimitive> _SdfPrimitives;
 
@@ -112,12 +113,20 @@ float GetDistanceToScene(float3 p) {
     return sp > 0 ? GetStackValue(stack, 0) : 1e10;
 }
 
-// Returns albedo by evaluating the full postfix operator tree with operator-aware blending.
+SdfMaterial LerpMaterial(SdfMaterial a, SdfMaterial b, float t) {
+    SdfMaterial r;
+    r.color      = lerp(a.color,      b.color,      t);
+    r.metallic   = lerp(a.metallic,   b.metallic,   t);
+    r.smoothness = lerp(a.smoothness, b.smoothness, t);
+    return r;
+}
+
+// Returns material by evaluating the full postfix operator tree with operator-aware blending.
 // — Union/Smooth Union:         blend toward whichever side is closer
 // — Intersect/Smooth Intersect: blend toward whichever side is more constraining
 // — Subtract/Smooth Subtract:   base (a) material, blending to cutter (b) at the cut face
 // — Shell, Expand:              material passes through unchanged
-float4 GetMaterialAtScene(float3 p) {
+SdfMaterial GetMaterialAtScene(float3 p) {
     SdfStack stack = (SdfStack)0;
     SdfMaterialStack matStack = (SdfMaterialStack)0;
     int sp = 0;
@@ -140,43 +149,62 @@ float4 GetMaterialAtScene(float3 p) {
             }
             if (sp < STACK_SIZE) {
                 SetStackValue(stack, sp, d);
-                SetMaterialStackValue(matStack, sp, _SdfPrimitives[node.primitiveIndex].albedo);
+                SdfMaterial prim_mat;
+                prim_mat.color      = _SdfPrimitives[node.primitiveIndex].color;
+                prim_mat.metallic   = _SdfPrimitives[node.primitiveIndex].material.x;
+                prim_mat.smoothness = _SdfPrimitives[node.primitiveIndex].material.y;
+                SetMaterialStackValue(matStack, sp, prim_mat);
                 sp++;
             }
         }
         else if (t <= SDF_BINARY_OPS_END && sp >= 2) { // binary operator — pop two, push result
             float b_d = GetStackValue(stack, --sp);
-            float4 b_mat = GetMaterialStackValue(matStack, sp);
+            SdfMaterial b_mat = GetMaterialStackValue(matStack, sp);
             float a_d = GetStackValue(stack, --sp);
-            float4 a_mat = GetMaterialStackValue(matStack, sp);
+            SdfMaterial a_mat = GetMaterialStackValue(matStack, sp);
             float r_d;
-            float4 r_mat;
+            SdfMaterial r_mat;
             if (t == SDF_UNION) {
                 r_d = min(a_d, b_d);
-                r_mat = a_d < b_d ? a_mat : b_mat;
+                if (a_d < b_d) {
+                    r_mat = a_mat;
+                }
+                else {
+                    r_mat = b_mat;
+                }
             }
             else if (t == SDF_SMOOTH_UNION) {
                 r_d = SmoothUnion(a_d, b_d, k);
                 float h = smoothstep(0.0, 1.0, 0.5 + 0.5 * (b_d - a_d) / k);
-                r_mat = lerp(b_mat, a_mat, h);
+                r_mat = LerpMaterial(b_mat, a_mat, h);
             }
             else if (t == SDF_INTERSECT) {
                 r_d = max(a_d, b_d);
-                r_mat = a_d > b_d ? a_mat : b_mat;
+                if (a_d > b_d) {
+                    r_mat = a_mat;
+                }
+                else {
+                    r_mat = b_mat;
+                }
             }
             else if (t == SDF_SMOOTH_INTERSECT) {
                 r_d = SmoothIntersect(a_d, b_d, k);
                 float h = smoothstep(0.0, 1.0, 0.5 + 0.5 * (a_d - b_d) / k);
-                r_mat = lerp(b_mat, a_mat, h);
+                r_mat = LerpMaterial(b_mat, a_mat, h);
             }
             else if (t == SDF_SUBTRACT) {
                 r_d = max(a_d, -b_d);
-                r_mat = a_d >= -b_d ? a_mat : b_mat;
+                if (a_d >= -b_d) {
+                    r_mat = a_mat;
+                }
+                else {
+                    r_mat = b_mat;
+                }
             }
             else { // SDF_SMOOTH_SUBTRACT
                 r_d = SmoothSubtract(a_d, b_d, k);
                 float h = smoothstep(0.0, 1.0, 0.5 + 0.5 * (a_d + b_d) / k);
-                r_mat = lerp(b_mat, a_mat, h);
+                r_mat = LerpMaterial(b_mat, a_mat, h);
             }
             SetStackValue(stack, sp, r_d);
             SetMaterialStackValue(matStack, sp, r_mat);
@@ -193,7 +221,10 @@ float4 GetMaterialAtScene(float3 p) {
             // material passes through unchanged
         }
     }
-    return sp > 0 ? GetMaterialStackValue(matStack, 0) : float4(1, 1, 1, 1);
+    if (sp > 0) return GetMaterialStackValue(matStack, 0);
+    SdfMaterial def = (SdfMaterial)0;
+    def.color = float4(1, 1, 1, 1);
+    return def;
 }
 
 #endif

@@ -201,6 +201,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
   nodeType: 0
+  color: {r: 0.7169812, g: 0.27394092, b: 0.27394092, a: 1}
+  metallic: 0.746
+  smoothness: 0.57
   sphereRadius: 0.5
   boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
   torusMajorRadius: 0.4
@@ -253,6 +256,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
   nodeType: 1
+  color: {r: 1, g: 1, b: 1, a: 1}
+  metallic: 0.225
+  smoothness: 0
   sphereRadius: 0.5
   boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
   torusMajorRadius: 0.4
@@ -555,11 +561,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
   nodeType: 10
+  color: {r: 1, g: 1, b: 1, a: 1}
+  metallic: 0
+  smoothness: 0.5
   sphereRadius: 0.5
   boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
   torusMajorRadius: 0.4
   torusMinorRadius: 0.15
-  smoothK: 0
+  smoothK: 0.098
   shellThickness: 0.05
   expandAmount: 0.01
 --- !u!114 &1194525269
@@ -792,11 +801,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
   nodeType: 13
+  color: {r: 1, g: 1, b: 1, a: 1}
+  metallic: 0
+  smoothness: 0.5
   sphereRadius: 0.5
   boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
   torusMajorRadius: 0.4
   torusMinorRadius: 0.15
-  smoothK: 0
+  smoothK: 0.071
   shellThickness: 0.05
   expandAmount: 0.01
 --- !u!1 &1522427159
@@ -856,7 +868,7 @@ Transform:
   m_GameObject: {fileID: 1735639795}
   serializedVersion: 2
   m_LocalRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0.12800002, y: 1.455, z: 0}
+  m_LocalPosition: {x: 0.565, y: 1.455, z: -0.227}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -875,6 +887,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SdfNodeComponent
   nodeType: 2
+  color: {r: 0.74461555, g: 0.5058824, b: 1, a: 1}
+  metallic: 0.037
+  smoothness: 0.652
   sphereRadius: 0.5
   boxHalfExtents: {x: 0.5, y: 0.5, z: 0.5}
   torusMajorRadius: 0.4

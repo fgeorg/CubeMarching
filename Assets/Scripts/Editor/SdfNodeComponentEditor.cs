@@ -46,7 +46,9 @@ public class SdfNodeComponentEditor : Editor {
         }
 
         if ((int)current.nodeType < SdfNodeTypeRanges.PrimitivesEnd) {
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("albedo"), new GUIContent("Albedo"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("color"), new GUIContent("Color"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("metallic"), new GUIContent("Metallic"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("smoothness"), new GUIContent("Smoothness"));
         }
 
         serializedObject.ApplyModifiedProperties();

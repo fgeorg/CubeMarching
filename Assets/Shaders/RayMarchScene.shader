@@ -2,9 +2,6 @@ Shader "RayMarchScene" {
     Properties {
         _MainTex ("Texture", 2D) = "white" {}
         _Tint ("Tint", Color) = (1, 1, 1, 1)
-        _Metallic ("Metallic", Range(0, 1)) = 0.0
-        _Smoothness ("Smoothness", Range(0, 1)) = 0.5
-
         [IntRange] _MaxSteps ("Max Steps", Range(1, 200)) = 50
         _MaxDist ("Max Dist", Range(1, 1000)) = 100
         _SurfDist ("Surf Dist", Range(0.00001, 0.1)) = 0.001
@@ -63,8 +60,6 @@ Shader "RayMarchScene" {
                 float _SurfDist;
                 float _NormalDist;
                 float _StepFactor;
-                float _Metallic;
-                float _Smoothness;
                 float _BackfaceCullMin;
                 float _BackfaceCullMax;
                 float _BackfaceCullThreshold;
@@ -130,16 +125,17 @@ Shader "RayMarchScene" {
                 float4 clipSpacePos = TransformWorldToHClip(p);
                 half3 normalWS = normalize(half3(GetNormal(p)));
 
+                SdfMaterial mat = GetMaterialAtScene(p);
                 SurfaceData surfaceData = (SurfaceData)0;
-                surfaceData.albedo     = half3(_Tint.rgb * GetMaterialAtScene(p).rgb);
-                surfaceData.metallic   = (half)_Metallic;
-                surfaceData.smoothness = (half)_Smoothness;
+                surfaceData.albedo     = half3(_Tint.rgb * mat.color.rgb);
+                surfaceData.metallic   = (half)mat.metallic;
+                surfaceData.smoothness = (half)mat.smoothness;
                 surfaceData.occlusion  = 1.0h;
                 surfaceData.alpha      = 1.0h;
                 surfaceData.normalTS   = half3(0, 0, 1);
 
                 col.rgb = SdfLighting(p, normalWS, clipSpacePos, surfaceData);
-                col.a = _Tint.a;
+                col.a = _Tint.a * mat.color.a;
 
                 float ndotv = dot(normalWS, rd);
 #if defined(_BACKFACECULLMODE_DISCARD)

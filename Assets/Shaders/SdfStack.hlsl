@@ -43,20 +43,25 @@ float GetStackValue(SdfStack stack, int index) {
     return 1e10; // Should not be reached
 }
 
-// Parallel material stack — same struct-with-switch pattern, holds float4 per slot.
-// Currently stores albedo; will grow to hold other PBR channels.
-struct SdfMaterialStack {
-    float4 s0;
-    float4 s1;
-    float4 s2;
-    float4 s3;
-    float4 s4;
-    float4 s5;
-    float4 s6;
-    float4 s7;
+struct SdfMaterial {
+    float4 color; // rgba
+    float metallic;
+    float smoothness;
 };
 
-void SetMaterialStackValue(inout SdfMaterialStack stack, int index, float4 val) {
+// Parallel material stack — same struct-with-switch pattern, holds SdfMaterial per slot.
+struct SdfMaterialStack {
+    SdfMaterial s0;
+    SdfMaterial s1;
+    SdfMaterial s2;
+    SdfMaterial s3;
+    SdfMaterial s4;
+    SdfMaterial s5;
+    SdfMaterial s6;
+    SdfMaterial s7;
+};
+
+void SetMaterialStackValue(inout SdfMaterialStack stack, int index, SdfMaterial val) {
     switch(index) {
         case 0: stack.s0 = val; break;
         case 1: stack.s1 = val; break;
@@ -69,7 +74,7 @@ void SetMaterialStackValue(inout SdfMaterialStack stack, int index, float4 val) 
     }
 }
 
-float4 GetMaterialStackValue(SdfMaterialStack stack, int index) {
+SdfMaterial GetMaterialStackValue(SdfMaterialStack stack, int index) {
     switch(index) {
         case 0: return stack.s0;
         case 1: return stack.s1;
@@ -80,7 +85,8 @@ float4 GetMaterialStackValue(SdfMaterialStack stack, int index) {
         case 6: return stack.s6;
         case 7: return stack.s7;
     }
-    return float4(1, 1, 1, 1); // Should not be reached
+    SdfMaterial def = (SdfMaterial)0; // Should not be reached
+    return def;
 }
 
 #endif

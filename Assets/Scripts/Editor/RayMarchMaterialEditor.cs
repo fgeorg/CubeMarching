@@ -26,11 +26,7 @@ public class RayMarchMaterialEditor : ShaderGUI {
             if (EditorGUI.EndChangeCheck())
                 p.floatValue = Mathf.Clamp(newVal, min, max);
         }
-        // --- Material ---
         Draw("_Tint");
-        Draw("_MainTex");
-        Draw("_Metallic");
-        Draw("_Smoothness");
         EditorGUILayout.Space();
 
         // --- Ray March ---
