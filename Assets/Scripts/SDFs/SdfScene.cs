@@ -31,6 +31,7 @@ public class SdfScene : MonoBehaviour {
     public event Action Rebuilt;
     public List<BakedSdfNode> Nodes => _nodes;
     public List<BakedSdfPrimitive> Primitives => _primitives;
+    public int NodeCount => _nodes.Count;
 
     private void OnEnable() {
         _rootNode = GetComponent<SdfNodeComponent>();

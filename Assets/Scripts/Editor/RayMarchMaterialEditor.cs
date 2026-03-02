@@ -53,6 +53,18 @@ public class RayMarchMaterialEditor : ShaderGUI {
             Draw("_BackfaceCullThreshold");
         }
 
+        // --- Voxel Acceleration ---
+        EditorGUILayout.LabelField("Voxel Acceleration", EditorStyles.boldLabel);
+        var voxelMode = FindProperty("_VoxelMode", properties);
+        editor.ShaderProperty(voxelMode, voxelMode.displayName);
+        if ((int)voxelMode.floatValue != 0) // not Off
+        {
+            Draw("_VoxelFilter");
+        }
+        if ((int)voxelMode.floatValue == 1) // Accel only
+        {
+            Draw("_MinSdfSteps");
+        }
         EditorGUILayout.Space();
         editor.RenderQueueField();
     }

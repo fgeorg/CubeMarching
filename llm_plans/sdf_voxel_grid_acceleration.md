@@ -20,7 +20,7 @@ int _SdfNodeCount;
 //   StructuredBuffer<SdfNode> _SdfNodes;
 //   StructuredBuffer<SdfPrimitive> _SdfPrimitives;
 
-RWTexture3D<half> _VoxelOut;  // matches RHalf texture format explicitly
+RWTexture3D<float> _VoxelOut;  // float UAV — DX11/SM5 doesn't support half UAVs; driver downcasts to RHalf on write
 float3 _VoxelOrigin;
 float  _VoxelCellSize;
 int    _VoxelResolution;
@@ -137,7 +137,7 @@ float  _VoxelResolution;
 **New sampler/texture declarations (outside CBUFFER):**
 ```hlsl
 TEXTURE3D(_VoxelTex);
-// Uses Unity built-in explicit samplers — no SAMPLER(sampler_VoxelTex) needed.
+// Uses Unity built-in explicit samplers — no SAMPLER(sampler_point_clamp) needed.
 // sampler_point_clamp and sampler_linear_clamp are always available in URP.
 ```
 
@@ -221,12 +221,12 @@ float3 GetNormal(float3 p) {
     float uvStep = 1.0 / _VoxelResolution;
     float3 uvw = (p - _VoxelOrigin) / (_VoxelCellSize * _VoxelResolution);
     float3 n = float3(
-        SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_VoxelTex, uvw + float3(uvStep, 0, 0), 0).r
-      - SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_VoxelTex, uvw - float3(uvStep, 0, 0), 0).r,
-        SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_VoxelTex, uvw + float3(0, uvStep, 0), 0).r
-      - SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_VoxelTex, uvw - float3(0, uvStep, 0), 0).r,
-        SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_VoxelTex, uvw + float3(0, 0, uvStep), 0).r
-      - SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_VoxelTex, uvw - float3(0, 0, uvStep), 0).r
+        SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_point_clamp, uvw + float3(uvStep, 0, 0), 0).r
+      - SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_point_clamp, uvw - float3(uvStep, 0, 0), 0).r,
+        SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_point_clamp, uvw + float3(0, uvStep, 0), 0).r
+      - SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_point_clamp, uvw - float3(0, uvStep, 0), 0).r,
+        SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_point_clamp, uvw + float3(0, 0, uvStep), 0).r
+      - SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_point_clamp, uvw - float3(0, 0, uvStep), 0).r
     );
     return normalize(n);
 #else
@@ -260,7 +260,7 @@ float3 GetNormal(float3 p) {
 - **`_VOXEL_DEBUG` overrides `_VOXEL_ACCEL_ENABLED`**: both can coexist as separate toggles; `_VOXEL_DEBUG` means "voxel only, no SDF eval".
 - **Resolution must be multiple of 4** (thread group size). Default 64 → 512³ bytes = 262 KB. 128 → 2 MB.
 - **Conservative skip**: uses `sqrt(3)/2 ≈ 0.866` cell-lengths subtracted (the half-diagonal of a unit cube), not 0.5. Subtracting only 0.5 would be unsafe — a ray at a voxel corner is 0.866 cell-lengths from center, so a step of `cellDist - 0.5` can overstep and clip through diagonal surfaces.
-- **`RHalf` format**: stores raw world-space distance, no encode/decode. `RWTexture3D<half>` is the explicit correct declaration for an RHalf UAV. Avoids the UNorm UAV typing issues that `R8` would require (`RWTexture3D<unorm float>`).
+- **`RHalf` format**: stores raw world-space distance, no encode/decode. Compute shader declares `RWTexture3D<float>` — DX11/SM5 doesn't support `half` UAVs, so `float` is the safe declaration regardless of backing texture precision; the driver handles the downcast to fp16 on write. The C# `RenderTextureFormat.RHalf` is correct and controls actual memory layout.
 - **Alternative worth trying — R8 + cell-length encoding**: since the grid is already quantized and sub-cell precision is meaningless, `R8` (256 levels, 1 byte/voxel) is arguably the right precision for this use case. The maximum storable distance of 255 cell-lengths comfortably covers any scene that fits inside the grid. Would require `RWTexture3D<unorm float>` in HLSL and `clamp(dist / _VoxelCellSize, 0, 255) / 255.0` encode / `encoded * 255.0 * _VoxelCellSize` decode. Halves memory footprint (256KB vs 512KB at 64³) and may improve cache performance. Try this if profiling shows texture bandwidth is a bottleneck.
 - **`_MaxDist` inside voxel branch**: both `continue` paths check `dO > _MaxDist` to prevent rays pointing at empty grid space burning the full `_MaxSteps` budget.
 - **Bounds are manual** for now: set `_voxelOrigin` and `_voxelCellSize` in Inspector to cover scene geometry. Future: auto-compute from primitive bounds.

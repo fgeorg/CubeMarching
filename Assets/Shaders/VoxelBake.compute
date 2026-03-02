@@ -1,0 +1,21 @@
+#pragma kernel BakeVoxels
+
+// _SdfNodeCount must be declared before SdfSceneDistanceGpu.hlsl,
+// which uses it in GetDistanceToScene().
+int _SdfNodeCount;
+#include "SdfSceneDistanceGpu.hlsl"
+
+RWTexture3D<float> _VoxelOut;  // float UAV — SM5 doesn't support half UAVs; driver downcasts to fp16 on write
+float3 _VoxelOrigin;
+float  _VoxelCellSize;
+int    _VoxelResolution;
+
+[numthreads(4, 4, 4)]
+void BakeVoxels(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id >= (uint)_VoxelResolution)) return;
+    float3 cellCenter = _VoxelOrigin + (id + 0.5) * _VoxelCellSize;
+    float dist = GetDistanceToScene(cellCenter);
+    // Store raw world-space distance; clamp negatives to 0 (interior voxels).
+    _VoxelOut[id] = (half)max(dist, 0.0);
+}
