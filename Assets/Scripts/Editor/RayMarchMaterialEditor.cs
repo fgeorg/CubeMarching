@@ -66,6 +66,28 @@ public class RayMarchMaterialEditor : ShaderGUI {
             Draw("_MinSdfSteps");
         }
         EditorGUILayout.Space();
+
+        // --- Temporal Warm-Start ---
+        EditorGUILayout.LabelField("Temporal Warm-Start", EditorStyles.boldLabel);
+        bool temporalOn = (editor.target as Material).IsKeywordEnabled("_TEMPORAL_WARMSTART_ON");
+        EditorGUI.BeginChangeCheck();
+        temporalOn = EditorGUILayout.Toggle("Enabled (requires TemporalWarmStartFeature)", temporalOn);
+        if (EditorGUI.EndChangeCheck())
+        {
+            foreach (Object t in editor.targets)
+            {
+                Material m = t as Material;
+                if (temporalOn)
+                {
+                    m.EnableKeyword("_TEMPORAL_WARMSTART_ON");
+                }
+                else
+                {
+                    m.DisableKeyword("_TEMPORAL_WARMSTART_ON");
+                }
+            }
+        }
+        EditorGUILayout.Space();
         editor.RenderQueueField();
     }
 }

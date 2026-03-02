@@ -41,6 +41,7 @@ Shader "RayMarchScene" {
             #pragma shader_feature_local _BACKFACECULLMODE_DISABLED _BACKFACECULLMODE_ALPHA _BACKFACECULLMODE_DISCARD
             #pragma shader_feature_local _VOXELMODE_OFF _VOXELMODE_ACCEL _VOXELMODE_DEBUG
             #pragma shader_feature_local _VOXELFILTER_POINT _VOXELFILTER_TRILINEAR _VOXELFILTER_SNAP _VOXELFILTER_MINECRAFT
+            #pragma shader_feature_local _TEMPORAL_WARMSTART_ON
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -56,6 +57,7 @@ Shader "RayMarchScene" {
                 float4 vertex : SV_POSITION;
                 float3 ro : TEXCOORD0;
                 float3 hitPos : TEXCOORD1;
+                float2 screenUV : TEXCOORD2;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -64,6 +66,11 @@ Shader "RayMarchScene" {
             TEXTURE3D(_VoxelTex);
             SAMPLER(sampler_point_clamp);
             SAMPLER(sampler_linear_clamp);
+
+            // Temporal warm-start globals (set by TemporalWarmStartFeature each frame).
+            TEXTURE2D(_PrevSdfDepthTex);
+            float4x4 _PrevInvVP;
+            float4   _PrevCameraPos;
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
@@ -92,6 +99,8 @@ Shader "RayMarchScene" {
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
                 o.ro = _WorldSpaceCameraPos;
                 o.hitPos = TransformObjectToWorld(v.vertex.xyz);
+                float4 screenPos = ComputeScreenPos(o.vertex);
+                o.screenUV = screenPos.xy / screenPos.w;
                 return o;
             }
 
@@ -202,13 +211,55 @@ Shader "RayMarchScene" {
                         faceNormal = -sign(rd) * mask;
                         return t;
                     }
+
+                    // Sphere-tracing skip: if this cell is far from the surface,
+                    // jump ahead along the full ray direction and rebuild all three
+                    // DDA axes from the new position.  Advancing along only one axis
+                    // desyncs the other two on diagonal rays, causing wrong hits.
+                    if (dist > _VoxelCellSize)
+                    {
+                        // Jump from the current face by (dist - cellSize).
+                        // The -cellSize margin accounts for the face-to-center gap
+                        // so we stay conservatively in empty space.
+                        float3 pJump = ro + (t + dist - _VoxelCellSize) * rd;
+                        cell = clamp(int3(floor((pJump - gridMin) / _VoxelCellSize)),
+                                     0, int(_VoxelResolution) - 1);
+                        float3 nb;
+                        nb.x = gridMin.x + (rd.x >= 0.0 ? float(cell.x + 1) : float(cell.x)) * _VoxelCellSize;
+                        nb.y = gridMin.y + (rd.y >= 0.0 ? float(cell.y + 1) : float(cell.y)) * _VoxelCellSize;
+                        nb.z = gridMin.z + (rd.z >= 0.0 ? float(cell.z + 1) : float(cell.z)) * _VoxelCellSize;
+                        tMax = (nb - ro) * invRd;
+                    }
                 }
                 return _MaxDist + 1.0;
             }
 #endif
 
-            float RayMarch(float3 ro, float3 rd) {
+            float RayMarch(float3 ro, float3 rd, float2 screenUV) {
                 float dO = 0;
+
+#if defined(_TEMPORAL_WARMSTART_ON)
+                // Sample the previous frame's NDC depth at this screen position.
+                // Reconstruct the world hit position, project it onto the current ray,
+                // then validate with the SDF. If valid, skip the empty-space portion.
+                float prevNdcZ = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, screenUV).r;
+                if (prevNdcZ > 0.0 && prevNdcZ < 1.0)
+                {
+                    float2 ndcXY = screenUV * 2.0 - 1.0;
+                    float4 worldPos4 = mul(_PrevInvVP, float4(ndcXY, prevNdcZ, 1.0));
+                    float3 worldPos = worldPos4.xyz / worldPos4.w;
+                    float t_hint = dot(worldPos - ro, rd);
+                    if (t_hint > 0.0)
+                    {
+                        float sdfVal = GetDistanceToScene(ro + t_hint * rd);
+                        if (sdfVal >= 0.0 && sdfVal < _MaxDist)
+                        {
+                            dO = max(0.0, t_hint - sdfVal);
+                        }
+                    }
+                }
+#endif
+
                 [loop]
                 for (int i = 0; i < _MaxSteps; i++) {
                     float3 p = ro + dO * rd;
@@ -262,7 +313,7 @@ Shader "RayMarchScene" {
                 float3 faceNormal;
                 float d = RayMarchDDA(ro, rd, faceNormal);
 #else
-                float d = RayMarch(ro, rd);
+                float d = RayMarch(ro, rd, i.screenUV);
 #endif
                 float4 col;
 
