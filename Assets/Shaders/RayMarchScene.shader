@@ -19,6 +19,7 @@ Shader "RayMarchScene" {
         [HideInInspector] _VoxelOrigin    ("Voxel Origin",    Vector) = (0,0,0,0)
         [HideInInspector] _VoxelCellSize  ("Voxel Cell Size", Float)  = 0.1
         [HideInInspector] _VoxelResolution("Voxel Resolution",Float)  = 64
+        [KeywordEnum(Off, Ndc)] _TemporalDebug ("Temporal Debug", Float) = 0
     }
     SubShader {
         Tags { "RenderType"="Transparent" "RenderPipeline"="UniversalRenderPipeline" "Queue"="Transparent" }
@@ -42,6 +43,7 @@ Shader "RayMarchScene" {
             #pragma shader_feature_local _VOXELMODE_OFF _VOXELMODE_ACCEL _VOXELMODE_DEBUG
             #pragma shader_feature_local _VOXELFILTER_POINT _VOXELFILTER_TRILINEAR _VOXELFILTER_SNAP _VOXELFILTER_MINECRAFT
             #pragma shader_feature_local _TEMPORAL_WARMSTART_ON
+            #pragma shader_feature_local _TEMPORALDEBUG_OFF _TEMPORALDEBUG_NDC
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -324,6 +326,18 @@ Shader "RayMarchScene" {
 
                 float3 p = ro + d * rd;
                 float4 clipSpacePos = TransformWorldToHClip(p);
+
+#if defined(_TEMPORALDEBUG_NDC)
+                // Debug: visualise the previous frame's stored NDC values at this pixel.
+                // R = ndcX remapped [−1,1]→[0,1], G = ndcY remapped, B = stored ndcZ [0,1].
+                // A flat red-green gradient with correct depth in blue means the texture and
+                // VP inverse are working.  A flipped/skewed gradient points to the bug.
+                float prevNdcZ_dbg = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, i.screenUV).r;
+                color = float4(prevNdcZ_dbg, prevNdcZ_dbg, prevNdcZ_dbg, 1.0);
+                depth = clipSpacePos.z / clipSpacePos.w;
+                return;
+#endif
+
 #if defined(_VOXELMODE_DEBUG) && defined(_VOXELFILTER_MINECRAFT)
                 half3 normalWS = half3(faceNormal);
 #else

@@ -72,6 +72,7 @@ public class RayMarchMaterialEditor : ShaderGUI {
         bool temporalOn = (editor.target as Material).IsKeywordEnabled("_TEMPORAL_WARMSTART_ON");
         EditorGUI.BeginChangeCheck();
         temporalOn = EditorGUILayout.Toggle("Enabled (requires TemporalWarmStartFeature)", temporalOn);
+        Draw("_TemporalDebug");
         if (EditorGUI.EndChangeCheck())
         {
             foreach (Object t in editor.targets)

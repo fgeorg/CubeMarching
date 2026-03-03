@@ -18,8 +18,8 @@ Shader "Hidden/CopySdfDepth"
             #pragma fragment Frag
             #pragma target 4.5
 
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
-
             SAMPLER(sampler_point_clamp);
 
             float4 Frag(Varyings input) : SV_Target

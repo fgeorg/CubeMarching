@@ -47,6 +47,7 @@ public class SdfRayMarchRenderer : MonoBehaviour {
 
     private void OnRebuilt() {
         if (_renderer == null || _sdfScene == null) return;
+        if (_propertyBlock == null) _propertyBlock = new MaterialPropertyBlock();
 
         var nodes = _sdfScene.Nodes;
         var primitives = _sdfScene.Primitives;

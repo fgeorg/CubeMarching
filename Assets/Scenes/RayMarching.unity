@@ -520,6 +520,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SdfRayMarchRenderer
   _sdfScene: {fileID: 1194525269}
+  _voxelBakeShader: {fileID: 0}
+  _enableVoxelAccel: 0
+  _voxelResolution: 64
+  _voxelCenter: {x: 0, y: 0, z: 0}
+  _voxelExtent: 10
 --- !u!4 &1263431985
 Transform:
   m_ObjectHideFlags: 0

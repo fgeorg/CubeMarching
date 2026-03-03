@@ -1,71 +1,109 @@
 # Temporal Warm-Start for SDF Ray Marching
 
 ## Context
-Each frame, `RayMarch` starts at `dO = 0` (camera near plane) and sphere-traces to the SDF surface. Most steps cross empty space. Since the scene is mostly static and camera movement is continuous, the previous frame's hit distance is an excellent predictor for the current frame. By starting the march near the previous hit we skip empty-space traversal, saving most step budget.
+Each frame, `RayMarch` starts at `dO = 0` (camera near plane) and sphere-traces to the SDF surface. Most steps cross empty space. Since the scene is mostly static and camera movement is continuous, the previous frame's hit distance is an excellent predictor for the current frame. By starting the march near the previous hit we skip empty-space traversal, saving most of the step budget.
 
 The SDF itself is the validity oracle: evaluate `GetDistanceToScene` at the hinted world position — if the result is a small positive value the hint is good; if negative (inside geometry) or very large (camera moved too far) we fall back to a full march from zero.
 
-## What We Store
-After transparent rendering, copy the hardware depth buffer (which includes our SDF `SV_Depth` output) to a persistent `RFloat` RTHandle. Ping-pong between two such handles each frame. Pass the previous frame's inverse VP matrix and camera position as global uniforms so the main shader can decode the stored NDC depth back to a world position and project it onto the current ray.
+## Approach: MRT (Multiple Render Targets)
 
-## New Files
-- `Assets/Shaders/CopySdfDepth.shader` — URP Blitter-based shader, reads `_BlitTexture` (depth), writes `float4(depth, 0, 0, 0)` to RFloat color target
-- `Assets/Scripts/RayMarching/TemporalWarmStartFeature.cs` — `ScriptableRenderFeature` with two passes
+The SDF fragment shader already computes the NDC Z of the hit point (it writes `SV_Depth`). We add a second render target output (`SV_Target1`) that writes this same NDC Z value to a persistent per-camera RTHandle. That RTHandle is the warm-start texture for the next frame — no blit, no hardware depth copy, no extra draw call, no extra shader.
 
-## Modified Files
-- `Assets/Shaders/RayMarchScene.shader`
+```
+Frame N:
+  BindPass    → set _PrevSdfDepthTex = prevHandle, set _PrevInvVP, _PrevCameraPos
+  SDF pass    → ray march + shade → SV_Target0 (color), SV_Target1 (NDC Z → currHandle), SV_Depth
+  [swap currHandle ↔ prevHandle for frame N+1]
+
+Frame N+1:
+  BindPass    → set _PrevSdfDepthTex = prevHandle  (= frame N's currHandle)
+  SDF pass    → warm-starts from _PrevSdfDepthTex, writes new currHandle
+  ...
+```
+
+State is per-camera (keyed by `Camera.GetInstanceID()`), so game view and scene view maintain independent histories.
+
+## Files Changed
+
+### New
+- `Assets/Scripts/RayMarching/TemporalWarmStartFeature.cs` — `ScriptableRendererFeature` with one bind pass; the SDF pass itself is the capture
+
+### Modified
+- `Assets/Shaders/RayMarchScene.shader` — add `SV_Target1` output + `_TEMPORAL_WARMSTART_ON` warm-start logic
+
+### Deleted / No Longer Needed
+- `Assets/Shaders/CopySdfDepth.shader` — was only needed for the now-abandoned hardware depth blit approach
+
+---
 
 ## TemporalWarmStartFeature.cs
 
-### Fields
+### Per-camera state (Dictionary<int, CameraState>)
 ```
-RTHandle m_PrevHandle, m_CurrHandle   // ping-pong RFloat screen-sized textures
-Matrix4x4 m_PrevInvVP                 // previous frame's (GPU proj * worldToCamera).inverse
-Vector3   m_PrevCameraPos             // previous frame's camera position
-bool      m_Initialized               // false on first frame — skip swap
-Material  m_CopyDepthMat              // instantiated from CopySdfDepth shader
+RTHandle prevHandle    // previous frame's NDC Z capture — bound as _PrevSdfDepthTex
+RTHandle currHandle    // this frame will write here via MRT SV_Target1
+Matrix4x4 prevInvVP   // (GPU proj * worldToCamera).inverse from last frame
+Vector3 prevCameraPos  // camera world position from last frame
+bool initialized       // false on first frame — skip swap
 ```
 
-### AddRenderPasses (called once per frame, C# side)
-1. `ReAllocateHandleIfNeeded` both handles (RFloat, screen-sized, no depth bits)
-2. If `m_Initialized`: swap `m_PrevHandle ↔ m_CurrHandle`; set `m_Initialized = true`
-3. Pass `m_PrevHandle`, `m_PrevInvVP`, `m_PrevCameraPos` to `BindPass`
-4. Pass `m_CurrHandle` to `CapturePass`
-5. Update `m_PrevInvVP` and `m_PrevCameraPos` from the current camera for next frame
-6. Enqueue both passes
+### AddRenderPasses
+1. Look up per-camera state (default to identity matrices + uninitialized on first seen camera)
+2. `ReAllocateHandleIfNeeded` both handles (R32_SFloat, screen-sized, no depth bits)
+3. If `initialized`: swap `prevHandle ↔ currHandle`; else set `initialized = true`
+4. Pass `prevHandle`, `prevInvVP`, `prevCameraPos` to `BindPass.Setup`
+5. Pass `currHandle` to the SDF pass setup (so the feature can attach it as SV_Target1)
+6. Update `prevInvVP` and `prevCameraPos` from the current camera for next frame
+7. Enqueue `BindPass`; the SDF MRT attachment is handled via `SetBeforeRendering` or a dedicated raster pass wrapping the SDF draw
 
 ### BindTemporalDataPass (RenderPassEvent.BeforeRenderingTransparents)
-`RecordRenderGraph`: `AddRasterRenderPass`, `AllowGlobalStateModification(true)`, in SetRenderFunc:
+`RecordRenderGraph`: `AddRasterRenderPass`, `AllowGlobalStateModification(true)`, in `SetRenderFunc`:
 - `cmd.SetGlobalTexture("_PrevSdfDepthTex", prevDepthHandle)`
 - `cmd.SetGlobalMatrix("_PrevInvVP", prevInvVP)`
 - `cmd.SetGlobalVector("_PrevCameraPos", prevCameraPos)`
 
-### CaptureDepthPass (RenderPassEvent.AfterRenderingTransparents)
-`RecordRenderGraph`: `AddBlitPass` (or `AddRasterRenderPass`) from `resourceData.cameraDepth` → imported `m_CurrHandle` using `m_CopyDepthMat`.
-Uses `RenderGraphUtils.BlitMaterialParameters`.
+Falls back to `renderGraph.defaultResources.blackTexture` on first frame (prevNdcZ == 0 → warm-start guard in shader skips the hint cleanly).
+
+### MRT attachment for the SDF pass
+The SDF material renders in URP's transparent forward pass. To attach `currHandle` as SV_Target1 we need a dedicated raster pass in the feature (RenderPassEvent.BeforeRenderingTransparents, after BindPass, or a custom event) that:
+- `SetRenderAttachment(activeColorTexture, 0)` — camera color
+- `SetRenderAttachment(currHandle, 1)` — depth capture
+- `SetRenderAttachmentDepth(cameraDepthTexture)`
+- Draws the SDF mesh with the SDF material
+
+This replaces URP's automatic transparent pass handling of the SDF object; the GameObject's MeshRenderer should be disabled or the material excluded from the default pass.
+
+---
 
 ## RayMarchScene.shader Changes
 
-### v2f struct — add:
-```hlsl
-float2 screenUV : TEXCOORD2;
-```
-
-### vert — add:
-```hlsl
-float4 screenPos = ComputeScreenPos(o.vertex);
-o.screenUV = screenPos.xy / screenPos.w;
-```
-
-### Declarations (outside CBUFFER, globals):
+### Pragma / declarations — add:
 ```hlsl
 #pragma shader_feature_local _TEMPORAL_WARMSTART_ON
-TEXTURE2D(_PrevSdfDepthTex);
-float4x4 _PrevInvVP;    // declared globally (set by render feature)
+
+TEXTURE2D(_PrevSdfDepthTex);   // globally set by TemporalWarmStartFeature
+float4x4 _PrevInvVP;
 float4   _PrevCameraPos;
 ```
 
-### RayMarch function — at the top, before the loop:
+### frag — add second output:
+```hlsl
+void frag(v2f i,
+    out float4 color        : SV_Target0,
+    out float  depthCapture : SV_Target1,
+    out float  depth        : SV_Depth)
+{
+    // ... existing march + shade logic ...
+
+    float ndcZ = clipSpacePos.z / clipSpacePos.w;
+    depth        = ndcZ;
+    depthCapture = ndcZ;   // captured for next frame's warm-start
+}
+```
+
+On miss (discard path): write `depthCapture = 0` before discarding so the guard `prevNdcZ > 0` correctly skips empty pixels next frame.
+
+### RayMarch — warm-start block (unchanged from current):
 ```hlsl
 #if defined(_TEMPORAL_WARMSTART_ON)
     float prevNdcZ = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, screenUV).r;
@@ -84,13 +122,22 @@ float4   _PrevCameraPos;
 #endif
 ```
 
-Note: `RayMarch` needs `screenUV` passed in as a parameter when `_TEMPORAL_WARMSTART_ON`.
+---
 
-## Manual Setup Step
-After adding the C# file, the user must add `TemporalWarmStartFeature` to `Assets/Settings/ForwardRenderer.asset` via the Inspector, and assign the `CopySdfDepth` shader to the feature's slot. Then enable the `_TEMPORAL_WARMSTART_ON` keyword on the SDF material.
+## Key Design Properties
+- **No blit / no extra pass**: depth capture is free — one extra float written per fragment
+- **Per-camera isolation**: game view and scene view each have their own RTHandle pair; no global bleed
+- **First-frame safe**: black texture fallback → `prevNdcZ == 0` → warm-start skipped cleanly
+- **Miss pixels safe**: explicit `depthCapture = 0` on discard → won't produce stale warm-start hints
+
+## Manual Setup
+- Add `TemporalWarmStartFeature` to the URP ForwardRenderer asset
+- No shader field to assign (CopySdfDepth is gone)
+- Enable `_TEMPORAL_WARMSTART_ON` on the SDF material
+- Disable URP's automatic rendering of the SDF MeshRenderer (feature owns the draw call)
 
 ## Verification
-- With feature active and keyword enabled: step count should drop significantly for static camera
-- SceneViewPerformanceOverlay (existing) shows GPU timing improvement
-- Moving the camera: first frame with large movement may revert to full march for some pixels; subsequent frames regain the warmstart
-- SDF scene change (move a node): validation step catches stale hints; no visible artifacts, just a brief step-count spike
+- Static camera: step count drops significantly (warm-start skips empty space)
+- Moving camera: first frame after large movement may revert to full march for some pixels; subsequent frames regain warm-start
+- Scene view and game view: independent depth histories, no cross-contamination
+- SDF scene change: SDF validity check catches stale hints; no visible artifacts, brief step-count spike only
