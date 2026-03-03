@@ -5,43 +5,44 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
 
-// Provides temporal warm-start for SDF ray marching via MRT (Multiple Render Targets).
-// The SDF shader writes NDC Z to SV_Target1 (currHandle) alongside its colour output,
-// so depth capture is free — no blit, no extra shader, no extra draw call.
+// Provides temporal warm-start for SDF ray marching via UAV write.
+// The SDF shader writes NDC Z to RWTexture2D _CurrSdfDepthTex (UAV slot 1).
 //
-// Per-camera ping-pong:
-//   Frame N:  bind prevHandle as _PrevSdfDepthTex → draw SDF (MRT) → currHandle captured
-//   Frame N+1: prevHandle ↔ currHandle swap → bind prevHandle → draw SDF → ...
+// Per-camera double-buffer (no ping-pong swap):
+//   Each frame:
+//     1. SdfMrtPass  — sets _PrevSdfDepthTex = prevHandle, draws SDF,
+//                      UAV-writes current NDC Z into currHandle.
+//     2. CopyToPrevPass — copies currHandle → prevHandle so next frame
+//                         can read it as _PrevSdfDepthTex.
+//
+// Reprojection uses UNITY_MATRIX_I_VP (current frame) in the shader, which is
+// the exact inverse of TransformWorldToHClip. No per-frame matrix upload needed.
 //
 // Setup:
 //   1. Add this feature to your URP ForwardRenderer asset.
 //   2. Enable _TEMPORAL_WARMSTART_ON on the SDF material.
-//   3. The SDF shader must use LightMode = "SdfMrt" (feature owns the draw call).
+//   3. The SDF shader must use LightMode = "SdfMrt".
 [ExecuteInEditMode]
 public class TemporalWarmStartFeature : ScriptableRendererFeature
 {
     // -------------------------------------------------------------------------
     // Per-camera persistent state (keyed by Camera.GetInstanceID)
-    // Avoids cross-camera contamination between game view and scene view.
     // -------------------------------------------------------------------------
     struct CameraState
     {
-        public Matrix4x4 prevInvVP;
-        public Vector3 prevCameraPos;
-        public RTHandle prevHandle;
-        public RTHandle currHandle;
-        public bool initialized;
+        public RTHandle  prevHandle;  // previous frame's depth (read by shader)
+        public RTHandle  currHandle;  // current  frame's depth (UAV write target)
+        public bool      initialized;
         // Per-camera pass instances — shared instances are wrong because
         // AddRenderPasses runs for ALL cameras before RecordRenderGraph runs
         // for any camera, so a shared instance's Setup() gets overwritten.
-        public BindTemporalDataPass bindPass;
-        public SdfMrtPass sdfMrtPass;
+        public SdfMrtPass     sdfMrtPass;
+        public CopyToPrevPass copyToPrevPass;
     }
 
     readonly Dictionary<int, CameraState> m_CameraStates = new Dictionary<int, CameraState>();
 
-    // Exposed for the SdfDepthDebugDisplay helper MonoBehaviour.
-    // Points to the previous frame's captured depth texture for the main camera.
+    // Exposed for SdfDepthDebugDisplay.
     [System.NonSerialized] public RenderTexture debugPrevTex;
     [System.NonSerialized] public RenderTexture debugCurrTex;
 
@@ -55,31 +56,29 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
-        Camera cam = renderingData.cameraData.camera;
-        int camId = cam.GetInstanceID();
+        Camera cam   = renderingData.cameraData.camera;
+        int    camId = cam.GetInstanceID();
 
         if (!m_CameraStates.TryGetValue(camId, out CameraState state))
         {
-            BindTemporalDataPass bindPass = new BindTemporalDataPass();
-            bindPass.renderPassEvent = RenderPassEvent.BeforeRenderingOpaques;
             SdfMrtPass sdfMrtPass = new SdfMrtPass();
             sdfMrtPass.renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
+            CopyToPrevPass copyToPrevPass = new CopyToPrevPass();
+            copyToPrevPass.renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
             state = new CameraState
             {
-                prevInvVP = Matrix4x4.identity,
-                prevCameraPos = Vector3.zero,
-                initialized = false,
-                bindPass = bindPass,
-                sdfMrtPass = sdfMrtPass
+                initialized    = false,
+                sdfMrtPass     = sdfMrtPass,
+                copyToPrevPass = copyToPrevPass
             };
         }
 
         // Realloc per-camera handles if resolution changed.
         RenderTextureDescriptor desc = renderingData.cameraData.cameraTargetDescriptor;
-        desc.msaaSamples = 1;
-        desc.depthBufferBits = 0;
-        desc.graphicsFormat = GraphicsFormat.R32_SFloat;
-        desc.enableRandomWrite = true; // required for SetRandomWriteTarget UAV write
+        desc.msaaSamples       = 1;
+        desc.depthBufferBits   = 0;
+        desc.graphicsFormat    = GraphicsFormat.R32_SFloat;
+        desc.enableRandomWrite = true; // required for UAV write (curr) and CopyTexture dst (prev)
 
         RTHandle prevHandle = state.prevHandle;
         RTHandle currHandle = state.currHandle;
@@ -90,38 +89,26 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
         state.prevHandle = prevHandle;
         state.currHandle = currHandle;
 
-        // Ping-pong: after first frame, prev = last frame's MRT capture.
-        if (state.initialized)
-        {
-            RTHandle tmp = state.prevHandle;
-            state.prevHandle = state.currHandle;
-            state.currHandle = tmp;
-        }
-        else
+        if (!state.initialized)
         {
             state.initialized = true;
         }
 
-        state.bindPass.Setup(state.prevHandle, state.prevInvVP, state.prevCameraPos);
-        state.sdfMrtPass.Setup(state.currHandle);
-
-        // Record current frame's matrices for next frame.
-        Matrix4x4 gpuProj = GL.GetGPUProjectionMatrix(cam.projectionMatrix, renderIntoTexture: true);
-        state.prevInvVP = (gpuProj * cam.worldToCameraMatrix).inverse;
-        state.prevCameraPos = cam.transform.position;
-
         m_CameraStates[camId] = state;
 
-        // Expose for SdfDepthDebugDisplay — only update for game cameras so the
-        // scene view camera doesn't overwrite these after the game camera runs.
-        if (cam.cameraType == CameraType.Game)
+        state.sdfMrtPass.Setup(state.currHandle, state.prevHandle);
+        state.copyToPrevPass.Setup(state.currHandle, state.prevHandle);
+
+        // Expose for SdfDepthDebugDisplay — game camera only so the scene view
+        // camera doesn't overwrite these references after the game camera sets them.
+        if (cam.cameraType == CameraType.SceneView)
         {
             debugPrevTex = state.prevHandle?.rt;
             debugCurrTex = state.currHandle?.rt;
         }
 
-        renderer.EnqueuePass(state.bindPass);
         renderer.EnqueuePass(state.sdfMrtPass);
+        renderer.EnqueuePass(state.copyToPrevPass);
     }
 
     protected override void Dispose(bool disposing)
@@ -135,94 +122,31 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
     }
 
     // =========================================================================
-    // BindTemporalDataPass
-    // Sets _PrevSdfDepthTex, _PrevInvVP, _PrevCameraPos as global shader
-    // properties before the SDF MRT pass executes.
-    // Falls back to black (prevNdcZ == 0 → warm-start skipped) on first frame.
-    // =========================================================================
-    class BindTemporalDataPass : ScriptableRenderPass
-    {
-        RTHandle m_PrevDepthHandle;
-        Matrix4x4 m_PrevInvVP;
-        Vector4 m_PrevCameraPos;
-
-        static readonly int s_PrevSdfDepthTexId = Shader.PropertyToID("_PrevSdfDepthTex");
-        static readonly int s_PrevInvVPId       = Shader.PropertyToID("_PrevInvVP");
-        static readonly int s_PrevCameraPosId   = Shader.PropertyToID("_PrevCameraPos");
-
-        public void Setup(RTHandle prevDepth, Matrix4x4 prevInvVP, Vector3 prevCameraPos)
-        {
-            m_PrevDepthHandle = prevDepth;
-            m_PrevInvVP       = prevInvVP;
-            m_PrevCameraPos   = new Vector4(prevCameraPos.x, prevCameraPos.y, prevCameraPos.z, 0f);
-        }
-
-        class PassData
-        {
-            public TextureHandle prevDepth;
-            public Matrix4x4 prevInvVP;
-            public Vector4 prevCameraPos;
-        }
-
-        public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
-        {
-            // Fall back to black (prevNdcZ == 0 disables warm-start) on first frame.
-            TextureHandle prevDepthHandle = renderGraph.defaultResources.blackTexture;
-
-            if (m_PrevDepthHandle != null)
-            {
-                TextureHandle imported = renderGraph.ImportTexture(m_PrevDepthHandle);
-                if (imported.IsValid())
-                {
-                    prevDepthHandle = imported;
-                }
-            }
-
-            using (var builder = renderGraph.AddRasterRenderPass<PassData>("BindTemporalData", out PassData passData))
-            {
-                passData.prevDepth     = prevDepthHandle;
-                passData.prevInvVP     = m_PrevInvVP;
-                passData.prevCameraPos = m_PrevCameraPos;
-
-                builder.UseTexture(prevDepthHandle, AccessFlags.Read);
-                builder.AllowGlobalStateModification(true);
-
-                builder.SetRenderFunc((PassData data, RasterGraphContext ctx) =>
-                {
-                    ctx.cmd.SetGlobalTexture(s_PrevSdfDepthTexId, data.prevDepth);
-                    ctx.cmd.SetGlobalMatrix(s_PrevInvVPId, data.prevInvVP);
-                    ctx.cmd.SetGlobalVector(s_PrevCameraPosId, data.prevCameraPos);
-                });
-            }
-        }
-    }
-
-    // =========================================================================
     // SdfMrtPass
-    // Draws all renderers using LightMode="SdfMrt" via an UnsafePass.
-    // Depth capture uses SetRandomWriteTarget (UAV write) instead of MRT:
-    //   - render target = camera colour + depth (single colour attachment, no MRT)
-    //   - UAV slot 1    = currHandle  (RWTexture2D in shader writes NDC Z here)
-    // This avoids Metal native-render-pass issues where non-zero MRT slots
-    // with imported external RTHandles are silently mis-routed.
+    // Sets _PrevSdfDepthTex global, then draws SDF with UAV depth capture.
+    // Reprojection uses UNITY_MATRIX_I_VP in the shader — no matrix upload.
     // =========================================================================
     class SdfMrtPass : ScriptableRenderPass
     {
-        static readonly ShaderTagId s_SdfMrtTag = new ShaderTagId("SdfMrt");
+        static readonly ShaderTagId s_SdfMrtTag        = new ShaderTagId("SdfMrt");
+        static readonly int         s_PrevSdfDepthTexId = Shader.PropertyToID("_PrevSdfDepthTex");
 
         RTHandle m_CurrHandle;
+        RTHandle m_PrevHandle;
 
-        public void Setup(RTHandle currHandle)
+        public void Setup(RTHandle currHandle, RTHandle prevHandle)
         {
             m_CurrHandle = currHandle;
+            m_PrevHandle = prevHandle;
         }
 
         class PassData
         {
             public RendererListHandle rendererList;
-            public TextureHandle colorTarget;
-            public TextureHandle depthTarget;
-            public RenderTexture currRT;
+            public TextureHandle      colorTarget;
+            public TextureHandle      depthTarget;
+            public RenderTexture      currRT;
+            public TextureHandle      prevDepth;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -241,7 +165,6 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
                 return;
             }
 
-            // Build renderer list: all transparent renderers with the SdfMrt light mode.
             SortingSettings sortSettings = new SortingSettings(cameraData.camera)
             {
                 criteria = SortingCriteria.CommonTransparent
@@ -258,10 +181,19 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
                 renderingData.cullResults, drawSettings, filterSettings);
             RendererListHandle sdfList = renderGraph.CreateRendererList(listParams);
 
-            // Import currHandle so the render graph knows this pass writes to it.
-            // This causes the RG to insert a Metal texture-cache barrier so the
-            // next frame's BindTemporalDataPass reads coherent UAV-written data.
+            // Import currHandle — declares UAV write for RG barrier tracking.
             TextureHandle currDepthHandle = renderGraph.ImportTexture(m_CurrHandle);
+
+            // Import prevHandle — fallback to black on first frame.
+            TextureHandle prevDepthHandle = renderGraph.defaultResources.blackTexture;
+            if (m_PrevHandle != null)
+            {
+                TextureHandle imported = renderGraph.ImportTexture(m_PrevHandle);
+                if (imported.IsValid())
+                {
+                    prevDepthHandle = imported;
+                }
+            }
 
             using (var builder = renderGraph.AddUnsafePass<PassData>("SdfMrtPass", out PassData passData))
             {
@@ -269,6 +201,7 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
                 passData.colorTarget  = resourceData.activeColorTexture;
                 passData.depthTarget  = resourceData.cameraDepth;
                 passData.currRT       = m_CurrHandle.rt;
+                passData.prevDepth    = prevDepthHandle;
 
                 builder.UseTexture(resourceData.activeColorTexture, AccessFlags.ReadWrite);
                 builder.UseTexture(resourceData.cameraDepth, AccessFlags.ReadWrite);
@@ -277,15 +210,82 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
                 {
                     builder.UseTexture(currDepthHandle, AccessFlags.Write);
                 }
+                if (prevDepthHandle.IsValid())
+                {
+                    builder.UseTexture(prevDepthHandle, AccessFlags.Read);
+                }
+
+                builder.AllowGlobalStateModification(true);
 
                 builder.SetRenderFunc((PassData data, UnsafeGraphContext ctx) =>
                 {
+                    // Set _PrevSdfDepthTex per-camera immediately before this camera's draw.
+                    ctx.cmd.SetGlobalTexture(s_PrevSdfDepthTexId, data.prevDepth);
+
                     ctx.cmd.SetRenderTarget(
                         (RenderTargetIdentifier)data.colorTarget,
                         (RenderTargetIdentifier)data.depthTarget);
                     ctx.cmd.SetRandomWriteTarget(1, data.currRT);
                     ctx.cmd.DrawRendererList(data.rendererList);
                     ctx.cmd.ClearRandomWriteTargets();
+                });
+            }
+        }
+    }
+
+    // =========================================================================
+    // CopyToPrevPass
+    // After SdfMrtPass, copies currHandle → prevHandle so next frame's
+    // SdfMrtPass reads the correct previous-frame depth.
+    // =========================================================================
+    class CopyToPrevPass : ScriptableRenderPass
+    {
+        RTHandle m_CurrHandle;
+        RTHandle m_PrevHandle;
+
+        public void Setup(RTHandle currHandle, RTHandle prevHandle)
+        {
+            m_CurrHandle = currHandle;
+            m_PrevHandle = prevHandle;
+        }
+
+        class PassData
+        {
+            public TextureHandle currTex;
+            public TextureHandle prevTex;
+            public RenderTexture currRT;
+            public RenderTexture prevRT;
+        }
+
+        public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
+        {
+            if (m_CurrHandle == null || m_CurrHandle.rt == null ||
+                m_PrevHandle == null || m_PrevHandle.rt == null)
+            {
+                return;
+            }
+
+            TextureHandle currTex = renderGraph.ImportTexture(m_CurrHandle);
+            TextureHandle prevTex = renderGraph.ImportTexture(m_PrevHandle);
+
+            if (!currTex.IsValid() || !prevTex.IsValid())
+            {
+                return;
+            }
+
+            using (var builder = renderGraph.AddUnsafePass<PassData>("CopyToPrevPass", out PassData passData))
+            {
+                passData.currTex = currTex;
+                passData.prevTex = prevTex;
+                passData.currRT  = m_CurrHandle.rt;
+                passData.prevRT  = m_PrevHandle.rt;
+
+                builder.UseTexture(currTex, AccessFlags.Read);
+                builder.UseTexture(prevTex, AccessFlags.Write);
+
+                builder.SetRenderFunc((PassData data, UnsafeGraphContext ctx) =>
+                {
+                    ctx.cmd.CopyTexture(data.currRT, data.prevRT);
                 });
             }
         }

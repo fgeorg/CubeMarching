@@ -19,12 +19,9 @@ Shader "RayMarchScene" {
         [HideInInspector] _VoxelOrigin    ("Voxel Origin",    Vector) = (0,0,0,0)
         [HideInInspector] _VoxelCellSize  ("Voxel Cell Size", Float)  = 0.1
         [HideInInspector] _VoxelResolution("Voxel Resolution",Float)  = 64
-        // Off   = normal rendering
-        // Ndc   = show previous frame's depth texture as grayscale
-        // WriteTime = write _Time.y to RT1 each frame; show it in color.
-        //             If the color slowly changes over time, RT1 write + ping-pong both work.
-        //             If it's frozen, the pipeline is broken.
-        [KeywordEnum(Off, Ndc, WriteTime)] _TemporalDebug ("Temporal Debug", Float) = 0
+        // Off = normal rendering
+        // Ndc = show previous frame's depth texture as grayscale
+        [KeywordEnum(Off, Ndc)] _TemporalDebug ("Temporal Debug", Float) = 0
     }
     SubShader {
         Tags { "RenderType"="Transparent" "RenderPipeline"="UniversalRenderPipeline" "Queue"="Transparent" }
@@ -48,7 +45,7 @@ Shader "RayMarchScene" {
             #pragma shader_feature_local _VOXELMODE_OFF _VOXELMODE_ACCEL _VOXELMODE_DEBUG
             #pragma shader_feature_local _VOXELFILTER_POINT _VOXELFILTER_TRILINEAR _VOXELFILTER_SNAP _VOXELFILTER_MINECRAFT
             #pragma shader_feature_local _TEMPORAL_WARMSTART_ON
-            #pragma shader_feature_local _TEMPORALDEBUG_OFF _TEMPORALDEBUG_NDC _TEMPORALDEBUG_WRITETIME
+            #pragma shader_feature_local _TEMPORALDEBUG_OFF _TEMPORALDEBUG_NDC
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -64,7 +61,7 @@ Shader "RayMarchScene" {
                 float4 vertex : SV_POSITION;
                 float3 ro : TEXCOORD0;
                 float3 hitPos : TEXCOORD1;
-                float2 screenUV : TEXCOORD2;
+                float4 screenPos : TEXCOORD2;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -76,8 +73,6 @@ Shader "RayMarchScene" {
 
             // Temporal warm-start globals (set by TemporalWarmStartFeature each frame).
             TEXTURE2D(_PrevSdfDepthTex);
-            float4x4 _PrevInvVP;
-            float4   _PrevCameraPos;
             // UAV for depth capture — written via SetRandomWriteTarget(1, currHandle).
             // Avoids MRT slot routing issues on Metal by bypassing framebuffer attachment.
             RWTexture2D<float> _CurrSdfDepthTex : register(u1);
@@ -109,8 +104,7 @@ Shader "RayMarchScene" {
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
                 o.ro = _WorldSpaceCameraPos;
                 o.hitPos = TransformObjectToWorld(v.vertex.xyz);
-                float4 screenPos = ComputeScreenPos(o.vertex);
-                o.screenUV = screenPos.xy / screenPos.w;
+                o.screenPos = ComputeScreenPos(o.vertex);
                 return o;
             }
 
@@ -249,23 +243,18 @@ Shader "RayMarchScene" {
                 float dO = 0;
 
 #if defined(_TEMPORAL_WARMSTART_ON)
-                // Sample the previous frame's NDC depth at this screen position.
-                // Reconstruct the world hit position, project it onto the current ray,
-                // then validate with the SDF. If valid, skip the empty-space portion.
-                float prevNdcZ = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, screenUV).r;
-                if (prevNdcZ > 0.0 && prevNdcZ < 1.0)
+// todo better visualize what's happening here and why it's not speeding things up at all
+                float t_hint = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, screenUV).r;
+                if (t_hint > 0.0)
                 {
-                    float2 ndcXY = screenUV * 2.0 - 1.0;
-                    float4 worldPos4 = mul(_PrevInvVP, float4(ndcXY, prevNdcZ, 1.0));
-                    float3 worldPos = worldPos4.xyz / worldPos4.w;
-                    float t_hint = dot(worldPos - ro, rd);
-                    if (t_hint > 0.0)
+                    float sdfVal = GetDistanceToScene(ro + t_hint * rd);
+                    // this was a decent guess
+                    if (abs(sdfVal) < 0.1)
                     {
-                        float sdfVal = GetDistanceToScene(ro + t_hint * rd);
-                        if (sdfVal >= 0.0 && sdfVal < _MaxDist)
-                        {
-                            dO = max(0.0, t_hint - sdfVal);
-                        }
+                        return t_hint;
+                    } else if (sdfVal < 0) {
+                        // bad guess start over
+                        dO = 0;
                     }
                 }
 #endif
@@ -320,6 +309,8 @@ Shader "RayMarchScene" {
                     discard;
                 }
 
+                float2 screenUV = i.screenPos.xy / i.screenPos.w;
+
                 float3 ro = i.ro;
                 float3 rd = normalize(i.hitPos - ro);
 
@@ -327,7 +318,7 @@ Shader "RayMarchScene" {
                 float3 faceNormal;
                 float d = RayMarchDDA(ro, rd, faceNormal);
 #else
-                float d = RayMarch(ro, rd, i.screenUV);
+                float d = RayMarch(ro, rd, screenUV);
 #endif
                 float4 col;
 
@@ -340,21 +331,10 @@ Shader "RayMarchScene" {
                 float4 clipSpacePos = TransformWorldToHClip(p);
 
 #if defined(_TEMPORALDEBUG_NDC)
-                float prevNdcZ_dbg = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, i.screenUV).r;
-                color = float4(prevNdcZ_dbg, prevNdcZ_dbg, prevNdcZ_dbg, 1.0);
+                float prevDist = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, screenUV).r;
                 depth = clipSpacePos.z / clipSpacePos.w;
-                _CurrSdfDepthTex[uint2(i.vertex.xy)] = depth;
-                return;
-#endif
-
-#if defined(_TEMPORALDEBUG_WRITETIME)
-                // red = what _PrevSdfDepthTex stored last frame, green = writing this frame.
-                // Both should advance together if RT1 write + ping-pong are working.
-                float timeVal     = frac(_Time.y * 0.5);
-                float prevTimeVal = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, i.screenUV).r;
-                color = float4(prevTimeVal, timeVal, 0.0, 1.0);
-                depth = clipSpacePos.z / clipSpacePos.w;
-                _CurrSdfDepthTex[uint2(i.vertex.xy)] = timeVal;
+                color = float4(prevDist, prevDist, prevDist, 1.0);
+                _CurrSdfDepthTex[uint2(i.vertex.xy)] = d;
                 return;
 #endif
 
