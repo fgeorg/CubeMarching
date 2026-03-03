@@ -19,7 +19,12 @@ Shader "RayMarchScene" {
         [HideInInspector] _VoxelOrigin    ("Voxel Origin",    Vector) = (0,0,0,0)
         [HideInInspector] _VoxelCellSize  ("Voxel Cell Size", Float)  = 0.1
         [HideInInspector] _VoxelResolution("Voxel Resolution",Float)  = 64
-        [KeywordEnum(Off, Ndc)] _TemporalDebug ("Temporal Debug", Float) = 0
+        // Off   = normal rendering
+        // Ndc   = show previous frame's depth texture as grayscale
+        // WriteTime = write _Time.y to RT1 each frame; show it in color.
+        //             If the color slowly changes over time, RT1 write + ping-pong both work.
+        //             If it's frozen, the pipeline is broken.
+        [KeywordEnum(Off, Ndc, WriteTime)] _TemporalDebug ("Temporal Debug", Float) = 0
     }
     SubShader {
         Tags { "RenderType"="Transparent" "RenderPipeline"="UniversalRenderPipeline" "Queue"="Transparent" }
@@ -28,7 +33,7 @@ Shader "RayMarchScene" {
 
         Pass {
             Name "UniversalForward"
-            Tags { "LightMode"="UniversalForward" }
+            Tags { "LightMode"="SdfMrt" }
 
             HLSLPROGRAM
             #pragma vertex vert
@@ -43,7 +48,7 @@ Shader "RayMarchScene" {
             #pragma shader_feature_local _VOXELMODE_OFF _VOXELMODE_ACCEL _VOXELMODE_DEBUG
             #pragma shader_feature_local _VOXELFILTER_POINT _VOXELFILTER_TRILINEAR _VOXELFILTER_SNAP _VOXELFILTER_MINECRAFT
             #pragma shader_feature_local _TEMPORAL_WARMSTART_ON
-            #pragma shader_feature_local _TEMPORALDEBUG_OFF _TEMPORALDEBUG_NDC
+            #pragma shader_feature_local _TEMPORALDEBUG_OFF _TEMPORALDEBUG_NDC _TEMPORALDEBUG_WRITETIME
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -73,6 +78,9 @@ Shader "RayMarchScene" {
             TEXTURE2D(_PrevSdfDepthTex);
             float4x4 _PrevInvVP;
             float4   _PrevCameraPos;
+            // UAV for depth capture — written via SetRandomWriteTarget(1, currHandle).
+            // Avoids MRT slot routing issues on Metal by bypassing framebuffer attachment.
+            RWTexture2D<float> _CurrSdfDepthTex : register(u1);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
@@ -299,12 +307,16 @@ Shader "RayMarchScene" {
                 return dO;
             }
 
-            void frag(v2f i, out float4 color : SV_Target, out float depth : SV_Depth) {
+            void frag(v2f i,
+                out float4 color : SV_Target0,
+                out float  depth : SV_Depth)
+            {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                // Initialize outputs so discard paths satisfy the compiler.
+                color = 0;
+                depth = 0;
 
                 if (_SdfNodeCount <= 0) {
-                    color = 0;
-                    depth = 0;
                     discard;
                 }
 
@@ -328,13 +340,21 @@ Shader "RayMarchScene" {
                 float4 clipSpacePos = TransformWorldToHClip(p);
 
 #if defined(_TEMPORALDEBUG_NDC)
-                // Debug: visualise the previous frame's stored NDC values at this pixel.
-                // R = ndcX remapped [−1,1]→[0,1], G = ndcY remapped, B = stored ndcZ [0,1].
-                // A flat red-green gradient with correct depth in blue means the texture and
-                // VP inverse are working.  A flipped/skewed gradient points to the bug.
                 float prevNdcZ_dbg = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, i.screenUV).r;
                 color = float4(prevNdcZ_dbg, prevNdcZ_dbg, prevNdcZ_dbg, 1.0);
                 depth = clipSpacePos.z / clipSpacePos.w;
+                _CurrSdfDepthTex[uint2(i.vertex.xy)] = depth;
+                return;
+#endif
+
+#if defined(_TEMPORALDEBUG_WRITETIME)
+                // red = what _PrevSdfDepthTex stored last frame, green = writing this frame.
+                // Both should advance together if RT1 write + ping-pong are working.
+                float timeVal     = frac(_Time.y * 0.5);
+                float prevTimeVal = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, i.screenUV).r;
+                color = float4(prevTimeVal, timeVal, 0.0, 1.0);
+                depth = clipSpacePos.z / clipSpacePos.w;
+                _CurrSdfDepthTex[uint2(i.vertex.xy)] = timeVal;
                 return;
 #endif
 
@@ -364,8 +384,8 @@ Shader "RayMarchScene" {
 #endif
 
                 color = saturate(col);
-                // convert to normalized device coordinates to get the depth
                 depth = clipSpacePos.z / clipSpacePos.w;
+                _CurrSdfDepthTex[uint2(i.vertex.xy)] = depth;
             }
             ENDHLSL
         }

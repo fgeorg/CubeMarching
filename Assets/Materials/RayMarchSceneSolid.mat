@@ -13,8 +13,8 @@ Material:
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _BACKFACECULLMODE_ALPHA
-  - _TEMPORALDEBUG_NDC
-  - _VOXELFILTER_POINT
+  - _TEMPORALDEBUG_WRITETIME
+  - _VOXELFILTER_MINECRAFT
   - _VOXELMODE_OFF
   m_InvalidKeywords:
   - _MARCHMODE_SIMPLE
@@ -112,7 +112,7 @@ Material:
     - _GlossyReflections: 0
     - _MarchMode: 0
     - _MaxDist: 100
-    - _MaxSteps: 40
+    - _MaxSteps: 50
     - _Metallic: 0
     - _MinSdfSteps: 32
     - _NormalDist: 0.00001
@@ -132,9 +132,9 @@ Material:
     - _StepFactor: 1
     - _SurfDist: 0.0000001
     - _Surface: 0
-    - _TemporalDebug: 1
+    - _TemporalDebug: 2
     - _VoxelCellSize: 0.1
-    - _VoxelFilter: 0
+    - _VoxelFilter: 3
     - _VoxelMode: 0
     - _VoxelResolution: 64
     - _WorkflowMode: 1
