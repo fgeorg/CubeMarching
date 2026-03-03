@@ -28,7 +28,7 @@ public class SdfScene : MonoBehaviour {
     private TransformTracker[] _trackers = Array.Empty<TransformTracker>();
     // Fired after the node list is fully updated. Subscribers (e.g.
     // SdfRayMarchRenderer) build their own GPU buffers from Nodes.
-    public event Action Rebuilt;
+    public static event Action Rebuilt;
     public List<BakedSdfNode> Nodes => _nodes;
     public List<BakedSdfPrimitive> Primitives => _primitives;
     public int NodeCount => _nodes.Count;

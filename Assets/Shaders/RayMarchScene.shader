@@ -44,12 +44,11 @@ Shader "RayMarchScene" {
             #pragma shader_feature_local _BACKFACECULLMODE_DISABLED _BACKFACECULLMODE_ALPHA _BACKFACECULLMODE_DISCARD
             #pragma shader_feature_local _VOXELMODE_OFF _VOXELMODE_ACCEL _VOXELMODE_DEBUG
             #pragma shader_feature_local _VOXELFILTER_POINT _VOXELFILTER_TRILINEAR _VOXELFILTER_SNAP _VOXELFILTER_MINECRAFT
-            #pragma shader_feature_local _TEMPORAL_WARMSTART_ON
+            #pragma shader_feature_local _PROGRESSIVE_REFINEMENT_ON
             #pragma shader_feature_local _TEMPORALDEBUG_OFF _TEMPORALDEBUG_NDC
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-            #include "SdfLighting.hlsl"
 
             struct appdata {
                 float4 vertex : POSITION;
@@ -96,6 +95,7 @@ Shader "RayMarchScene" {
             CBUFFER_END
 
             #include "SdfSceneDistanceGpu.hlsl"
+            #include "SdfLighting.hlsl"
 
             v2f vert(appdata v) {
                 v2f o;
@@ -135,9 +135,9 @@ Shader "RayMarchScene" {
             float3 GetNormal(float3 p) {
                 float2 e = float2(_NormalDist, 0);
                 float3 n = float3(
-                    GetDistanceToScene(p + e.xyy),
-                    GetDistanceToScene(p + e.yxy),
-                    GetDistanceToScene(p + e.yyx)
+                GetDistanceToScene(p + e.xyy),
+                GetDistanceToScene(p + e.yxy),
+                GetDistanceToScene(p + e.yyx)
                 ) - GetDistanceToScene(p);
                 return normalize(n);
             }
@@ -172,7 +172,7 @@ Shader "RayMarchScene" {
                 // Starting cell — nudge inside the grid to avoid landing exactly on a face.
                 float3 pEnter = ro + (tEnter + 1e-4 * _VoxelCellSize) * rd;
                 int3 cell = clamp(int3(floor((pEnter - gridMin) / _VoxelCellSize)),
-                                  0, int(_VoxelResolution) - 1);
+                0, int(_VoxelResolution) - 1);
 
                 // Per-axis step direction and t increment.
                 int3   stepDir = int3(sign(rd));
@@ -227,7 +227,7 @@ Shader "RayMarchScene" {
                         // so we stay conservatively in empty space.
                         float3 pJump = ro + (t + dist - _VoxelCellSize) * rd;
                         cell = clamp(int3(floor((pJump - gridMin) / _VoxelCellSize)),
-                                     0, int(_VoxelResolution) - 1);
+                        0, int(_VoxelResolution) - 1);
                         float3 nb;
                         nb.x = gridMin.x + (rd.x >= 0.0 ? float(cell.x + 1) : float(cell.x)) * _VoxelCellSize;
                         nb.y = gridMin.y + (rd.y >= 0.0 ? float(cell.y + 1) : float(cell.y)) * _VoxelCellSize;
@@ -239,26 +239,7 @@ Shader "RayMarchScene" {
             }
 #endif
 
-            float RayMarch(float3 ro, float3 rd, float2 screenUV) {
-                float dO = 0;
-
-#if defined(_TEMPORAL_WARMSTART_ON)
-// todo better visualize what's happening here and why it's not speeding things up at all
-                float t_hint = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, screenUV).r;
-                if (t_hint > 0.0)
-                {
-                    float sdfVal = GetDistanceToScene(ro + t_hint * rd);
-                    // this was a decent guess
-                    if (abs(sdfVal) < 0.1)
-                    {
-                        return t_hint;
-                    } else if (sdfVal < 0) {
-                        // bad guess start over
-                        dO = 0;
-                    }
-                }
-#endif
-
+            float RayMarch(float3 ro, float3 rd, float dO) {
                 [loop]
                 for (int i = 0; i < _MaxSteps; i++) {
                     float3 p = ro + dO * rd;
@@ -277,7 +258,7 @@ Shader "RayMarchScene" {
                         // so grazing rays don't exhaust the budget on voxel skips.
                         if (i < _MaxSteps - _MinSdfSteps) {
                             float safeSkip = max(voxDist - VOXEL_HALF_DIAGONAL * _VoxelCellSize,
-                                                 0.1 * _VoxelCellSize);
+                            0.1 * _VoxelCellSize);
                             if (voxDist > _VoxelCellSize) {
                                 dO += safeSkip;
                                 if (dO > _MaxDist) break;
@@ -297,8 +278,8 @@ Shader "RayMarchScene" {
             }
 
             void frag(v2f i,
-                out float4 color : SV_Target0,
-                out float  depth : SV_Depth)
+            out float4 color : SV_Target0,
+            out float  depth : SV_Depth)
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
                 // Initialize outputs so discard paths satisfy the compiler.
@@ -313,18 +294,25 @@ Shader "RayMarchScene" {
 
                 float3 ro = i.ro;
                 float3 rd = normalize(i.hitPos - ro);
+#if defined(_PROGRESSIVE_REFINEMENT_ON)
+                // todo better visualize what's happening here and why it's not speeding things up at all
+                float dO = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, screenUV).r;
+#else
+                float dO = 0;
+#endif
 
 #if defined(_VOXELMODE_DEBUG) && defined(_VOXELFILTER_MINECRAFT)
                 float3 faceNormal;
                 float d = RayMarchDDA(ro, rd, faceNormal);
 #else
-                float d = RayMarch(ro, rd, screenUV);
+                float d = RayMarch(ro, rd, dO);
 #endif
                 float4 col;
 
                 if (d > _MaxDist) {
                     col.a = 0;
-                    discard;
+                    _CurrSdfDepthTex[uint2(i.vertex.xy)] = d;
+                    return;
                 }
 
                 float3 p = ro + d * rd;
@@ -345,27 +333,23 @@ Shader "RayMarchScene" {
 #endif
 
                 SdfMaterial mat = GetMaterialAtScene(p);
-                SurfaceData surfaceData = (SurfaceData)0;
-                surfaceData.albedo     = half3(_Tint.rgb * mat.color.rgb);
-                surfaceData.metallic   = (half)mat.metallic;
-                surfaceData.smoothness = (half)mat.smoothness;
-                surfaceData.occlusion  = 1.0h;
-                surfaceData.alpha      = 1.0h;
-                surfaceData.normalTS   = half3(0, 0, 1);
-
-                col.rgb = SdfLighting(p, normalWS, clipSpacePos, surfaceData);
-                col.a = _Tint.a * mat.color.a;
+                col.rgb = SdfLighting(p, normalWS, clipSpacePos, mat, half4(_Tint)).rgb;
+                col.a = 1;
 
                 float ndotv = dot(normalWS, rd);
 #if defined(_BACKFACECULLMODE_DISCARD)
-                if (ndotv > _BackfaceCullThreshold) discard;
+                if (ndotv > _BackfaceCullThreshold) {
+                    col.a = 0;
+                    _CurrSdfDepthTex[uint2(i.vertex.xy)] = d;
+                    return;
+                };
 #elif defined(_BACKFACECULLMODE_ALPHA)
                 col.a *= 1 - smoothstep(_BackfaceCullMin, _BackfaceCullMax, ndotv);
 #endif
 
                 color = saturate(col);
                 depth = clipSpacePos.z / clipSpacePos.w;
-                _CurrSdfDepthTex[uint2(i.vertex.xy)] = depth;
+                _CurrSdfDepthTex[uint2(i.vertex.xy)] = d;
             }
             ENDHLSL
         }

@@ -28,12 +28,12 @@ public class SdfRayMarchRenderer : MonoBehaviour {
     private void OnEnable() {
         _renderer = GetComponent<Renderer>();
         _propertyBlock = new MaterialPropertyBlock();
-        if (_sdfScene != null) _sdfScene.Rebuilt += OnRebuilt;
+        SdfScene.Rebuilt += OnRebuilt;
         OnRebuilt(); // sync immediately in case SdfScene already has data
     }
 
     private void OnDisable() {
-        if (_sdfScene != null) _sdfScene.Rebuilt -= OnRebuilt;
+        SdfScene.Rebuilt -= OnRebuilt;
         _buffer?.Release();
         _buffer = null;
         _primitivesBuffer?.Release();

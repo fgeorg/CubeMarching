@@ -62,9 +62,7 @@ public class MeshGenerator : MonoBehaviour {
     }
 
     protected void OnEnable() {
-        if (_sdfScene != null) {
-            _sdfScene.Rebuilt += MarkDirty;
-        }
+        SdfScene.Rebuilt += MarkDirty;
         _selfTracker = new TransformTracker(transform);
         MarkDirty();
     }
@@ -76,9 +74,7 @@ public class MeshGenerator : MonoBehaviour {
         if (_dedupedMesh != null) {
             _dedupedMesh.Clear();
         }
-        if (_sdfScene != null) {
-            _sdfScene.Rebuilt -= MarkDirty;
-        }
+        SdfScene.Rebuilt -= MarkDirty;
     }
 
     protected void OnValidate() {

@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
 
-// Provides temporal warm-start for SDF ray marching via UAV write.
+// Provides progressive (multiframe) refinement for SDF ray marching via UAV write.
 // The SDF shader writes NDC Z to RWTexture2D _CurrSdfDepthTex (UAV slot 1).
 //
 // Per-camera double-buffer (no ping-pong swap):
@@ -14,16 +14,18 @@ using UnityEngine.Rendering.Universal;
 //                      UAV-writes current NDC Z into currHandle.
 //     2. CopyToPrevPass — copies currHandle → prevHandle so next frame
 //                         can read it as _PrevSdfDepthTex.
+//                         If the camera moved OR the SDF scene was rebuilt,
+//                         clears prevHandle to black instead (invalidates cache).
 //
 // Reprojection uses UNITY_MATRIX_I_VP (current frame) in the shader, which is
 // the exact inverse of TransformWorldToHClip. No per-frame matrix upload needed.
 //
 // Setup:
 //   1. Add this feature to your URP ForwardRenderer asset.
-//   2. Enable _TEMPORAL_WARMSTART_ON on the SDF material.
+//   2. Enable _PROGRESSIVE_REFINEMENT_ON on the SDF material.
 //   3. The SDF shader must use LightMode = "SdfMrt".
 [ExecuteInEditMode]
-public class TemporalWarmStartFeature : ScriptableRendererFeature
+public class ProgressiveRefinementFeature : ScriptableRendererFeature
 {
     // -------------------------------------------------------------------------
     // Per-camera persistent state (keyed by Camera.GetInstanceID)
@@ -33,6 +35,7 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
         public RTHandle  prevHandle;  // previous frame's depth (read by shader)
         public RTHandle  currHandle;  // current  frame's depth (UAV write target)
         public bool      initialized;
+        public Matrix4x4 prevViewMatrix;  // view matrix from last frame — used to detect camera movement
         // Per-camera pass instances — shared instances are wrong because
         // AddRenderPasses runs for ALL cameras before RecordRenderGraph runs
         // for any camera, so a shared instance's Setup() gets overwritten.
@@ -46,12 +49,31 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
     [System.NonSerialized] public RenderTexture debugPrevTex;
     [System.NonSerialized] public RenderTexture debugCurrTex;
 
+    // Frame counter set when SdfScene.Rebuilt fires — used to invalidate caches
+    // for one frame after any SDF geometry change.
+    int m_SceneDirtyFrame = -1;
+
     // =========================================================================
     // ScriptableRendererFeature API
     // =========================================================================
     public override void Create()
     {
         // Pass instances are created lazily per-camera in AddRenderPasses.
+    }
+
+    void OnEnable()
+    {
+        SdfScene.Rebuilt += OnSdfSceneRebuilt;
+    }
+
+    void OnDisable()
+    {
+        SdfScene.Rebuilt -= OnSdfSceneRebuilt;
+    }
+
+    void OnSdfSceneRebuilt()
+    {
+        m_SceneDirtyFrame = Time.frameCount;
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -94,10 +116,16 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
             state.initialized = true;
         }
 
+        Matrix4x4 currViewMatrix = cam.worldToCameraMatrix;
+        bool cameraMoved  = currViewMatrix != state.prevViewMatrix;
+        bool sceneDirty   = (Time.frameCount == m_SceneDirtyFrame);
+        bool invalidate   = cameraMoved || sceneDirty;
+        state.prevViewMatrix = currViewMatrix;
+
         m_CameraStates[camId] = state;
 
         state.sdfMrtPass.Setup(state.currHandle, state.prevHandle);
-        state.copyToPrevPass.Setup(state.currHandle, state.prevHandle);
+        state.copyToPrevPass.Setup(state.currHandle, state.prevHandle, invalidate);
 
         // Expose for SdfDepthDebugDisplay — game camera only so the scene view
         // camera doesn't overwrite these references after the game camera sets them.
@@ -237,16 +265,20 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
     // CopyToPrevPass
     // After SdfMrtPass, copies currHandle → prevHandle so next frame's
     // SdfMrtPass reads the correct previous-frame depth.
+    // If invalidate is true (camera moved or SDF scene rebuilt), clears
+    // prevHandle to black instead so stale depth is not reused.
     // =========================================================================
     class CopyToPrevPass : ScriptableRenderPass
     {
         RTHandle m_CurrHandle;
         RTHandle m_PrevHandle;
+        bool     m_Invalidate;
 
-        public void Setup(RTHandle currHandle, RTHandle prevHandle)
+        public void Setup(RTHandle currHandle, RTHandle prevHandle, bool invalidate)
         {
-            m_CurrHandle = currHandle;
-            m_PrevHandle = prevHandle;
+            m_CurrHandle  = currHandle;
+            m_PrevHandle  = prevHandle;
+            m_Invalidate  = invalidate;
         }
 
         class PassData
@@ -255,6 +287,7 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
             public TextureHandle prevTex;
             public RenderTexture currRT;
             public RenderTexture prevRT;
+            public bool          invalidate;
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -275,17 +308,26 @@ public class TemporalWarmStartFeature : ScriptableRendererFeature
 
             using (var builder = renderGraph.AddUnsafePass<PassData>("CopyToPrevPass", out PassData passData))
             {
-                passData.currTex = currTex;
-                passData.prevTex = prevTex;
-                passData.currRT  = m_CurrHandle.rt;
-                passData.prevRT  = m_PrevHandle.rt;
+                passData.currTex    = currTex;
+                passData.prevTex    = prevTex;
+                passData.currRT     = m_CurrHandle.rt;
+                passData.prevRT     = m_PrevHandle.rt;
+                passData.invalidate = m_Invalidate;
 
                 builder.UseTexture(currTex, AccessFlags.Read);
                 builder.UseTexture(prevTex, AccessFlags.Write);
 
                 builder.SetRenderFunc((PassData data, UnsafeGraphContext ctx) =>
                 {
-                    ctx.cmd.CopyTexture(data.currRT, data.prevRT);
+                    if (data.invalidate)
+                    {
+                        ctx.cmd.SetRenderTarget(data.prevRT);
+                        ctx.cmd.ClearRenderTarget(false, true, Color.black);
+                    }
+                    else
+                    {
+                        ctx.cmd.CopyTexture(data.currRT, data.prevRT);
+                    }
                 });
             }
         }

@@ -1,15 +1,15 @@
 using UnityEngine;
 
-// Displays the temporal warm-start depth textures (prev/curr) on two quads.
+// Displays the progressive refinement depth textures (prev/curr) on two quads.
 // Setup:
-//   1. Assign the TemporalWarmStartFeature asset from your URP renderer.
+//   1. Assign the ProgressiveRefinementFeature asset from your URP renderer.
 //   2. Assign a Renderer for prevQuad (shows last frame's depth — _PrevSdfDepthTex).
 //   3. Assign a Renderer for currQuad (shows this frame's depth capture — currHandle).
 //   Materials are created automatically — no manual render texture or material needed.
 [ExecuteInEditMode]
 public class SdfDepthDebugDisplay : MonoBehaviour
 {
-    public TemporalWarmStartFeature feature;
+    public ProgressiveRefinementFeature feature;
     public Renderer prevQuad;
     public Renderer currQuad;
 

@@ -67,11 +67,11 @@ public class RayMarchMaterialEditor : ShaderGUI {
         }
         EditorGUILayout.Space();
 
-        // --- Temporal Warm-Start ---
-        EditorGUILayout.LabelField("Temporal Warm-Start", EditorStyles.boldLabel);
-        bool temporalOn = (editor.target as Material).IsKeywordEnabled("_TEMPORAL_WARMSTART_ON");
+        // --- Progressive Refinement ---
+        EditorGUILayout.LabelField("Progressive Refinement", EditorStyles.boldLabel);
+        bool temporalOn = (editor.target as Material).IsKeywordEnabled("_PROGRESSIVE_REFINEMENT_ON");
         EditorGUI.BeginChangeCheck();
-        temporalOn = EditorGUILayout.Toggle("Enabled (requires TemporalWarmStartFeature)", temporalOn);
+        temporalOn = EditorGUILayout.Toggle("Enabled (requires ProgressiveRefinementFeature)", temporalOn);
         Draw("_TemporalDebug");
         if (EditorGUI.EndChangeCheck())
         {
@@ -80,11 +80,11 @@ public class RayMarchMaterialEditor : ShaderGUI {
                 Material m = t as Material;
                 if (temporalOn)
                 {
-                    m.EnableKeyword("_TEMPORAL_WARMSTART_ON");
+                    m.EnableKeyword("_PROGRESSIVE_REFINEMENT_ON");
                 }
                 else
                 {
-                    m.DisableKeyword("_TEMPORAL_WARMSTART_ON");
+                    m.DisableKeyword("_PROGRESSIVE_REFINEMENT_ON");
                 }
             }
         }
