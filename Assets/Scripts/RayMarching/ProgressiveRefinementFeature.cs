@@ -30,11 +30,12 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
     // -------------------------------------------------------------------------
     // Per-camera persistent state (keyed by Camera.GetInstanceID)
     // -------------------------------------------------------------------------
-    struct CameraState
+    class CameraState
     {
         public RTHandle  prevHandle;  // previous frame's depth (read by shader)
         public RTHandle  currHandle;  // current  frame's depth (UAV write target)
         public bool      initialized;
+        public bool      sceneDirty;      // set by OnSdfSceneRebuilt, consumed in AddRenderPasses
         public Matrix4x4 prevViewMatrix;  // view matrix from last frame — used to detect camera movement
         // Per-camera pass instances — shared instances are wrong because
         // AddRenderPasses runs for ALL cameras before RecordRenderGraph runs
@@ -44,10 +45,6 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
     }
 
     readonly Dictionary<int, CameraState> m_CameraStates = new Dictionary<int, CameraState>();
-
-    // Frame counter set when SdfScene.Rebuilt fires — used to invalidate caches
-    // for one frame after any SDF geometry change.
-    int m_SceneDirtyFrame = -1;
 
     // =========================================================================
     // ScriptableRendererFeature API
@@ -69,7 +66,10 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
 
     void OnSdfSceneRebuilt()
     {
-        m_SceneDirtyFrame = Time.frameCount;
+        foreach (CameraState state in m_CameraStates.Values)
+        {
+            state.sceneDirty = true;
+        }
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -89,6 +89,7 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
                 sdfMrtPass     = sdfMrtPass,
                 copyToPrevPass = copyToPrevPass
             };
+            m_CameraStates[camId] = state;
         }
 
         // Realloc per-camera handles if resolution changed.
@@ -113,14 +114,13 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
         }
 
         Matrix4x4 currViewMatrix = cam.worldToCameraMatrix;
-        bool cameraMoved  = currViewMatrix != state.prevViewMatrix;
-        bool sceneDirty   = (Time.frameCount == m_SceneDirtyFrame);
-        bool invalidate   = cameraMoved || sceneDirty;
-        state.prevViewMatrix = currViewMatrix;
+        bool invalidate      = currViewMatrix != state.prevViewMatrix || state.sceneDirty;
+        state.sceneDirty     = false;
+        state.prevViewMatrix     = currViewMatrix;
 
         m_CameraStates[camId] = state;
 
-        state.sdfMrtPass.Setup(state.currHandle, state.prevHandle);
+        state.sdfMrtPass.Setup(state.currHandle, state.prevHandle, invalidate);
         state.copyToPrevPass.Setup(state.currHandle, state.prevHandle, invalidate);
 
         renderer.EnqueuePass(state.sdfMrtPass);
@@ -149,11 +149,13 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
 
         RTHandle m_CurrHandle;
         RTHandle m_PrevHandle;
+        bool     m_Invalidate;
 
-        public void Setup(RTHandle currHandle, RTHandle prevHandle)
+        public void Setup(RTHandle currHandle, RTHandle prevHandle, bool invalidate)
         {
-            m_CurrHandle = currHandle;
-            m_PrevHandle = prevHandle;
+            m_CurrHandle  = currHandle;
+            m_PrevHandle  = prevHandle;
+            m_Invalidate  = invalidate;
         }
 
         class PassData
@@ -200,9 +202,12 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
             // Import currHandle — declares UAV write for RG barrier tracking.
             TextureHandle currDepthHandle = renderGraph.ImportTexture(m_CurrHandle);
 
-            // Import prevHandle — fallback to black on first frame.
+            // Import prevHandle — fallback to black on first frame or when invalidated
+            // (camera moved / scene rebuilt). Using black prevents the SDF shader from
+            // reading stale depth with new camera matrices, which would flash for one frame
+            // before CopyToPrevPass gets a chance to clear it.
             TextureHandle prevDepthHandle = renderGraph.defaultResources.blackTexture;
-            if (m_PrevHandle != null)
+            if (!m_Invalidate && m_PrevHandle != null)
             {
                 TextureHandle imported = renderGraph.ImportTexture(m_PrevHandle);
                 if (imported.IsValid())
