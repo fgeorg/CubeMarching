@@ -2,6 +2,10 @@ using UnityEditor;
 using UnityEngine;
 
 public class RayMarchMaterialEditor : ShaderGUI {
+    enum BackfaceCullMode { Off = 0, Alpha = 1, Discard = 2 }
+    enum MinDistFadeMode  { Off = 0, Enabled = 1 }
+    enum VoxelMode        { Off = 0, AccelOnly = 1, Full = 2 }
+
     public override void OnGUI(MaterialEditor editor, MaterialProperty[] properties) {
         var backfaceMode = FindProperty("_BackfaceCullMode", properties);
 
@@ -33,7 +37,6 @@ public class RayMarchMaterialEditor : ShaderGUI {
         EditorGUILayout.LabelField("Ray March", EditorStyles.boldLabel);
         Draw("_MaxSteps");
         Draw("_MaxDist");
-        DrawLog("_SurfDist", 1e-7f, 0.1f);
         DrawLog("_NormalDist", 1e-7f, 0.1f);
         Draw("_StepFactor");
         EditorGUILayout.Space();
@@ -43,25 +46,42 @@ public class RayMarchMaterialEditor : ShaderGUI {
         editor.ShaderProperty(backfaceMode, backfaceMode.displayName);
         EditorGUILayout.Space();
 
-        int modeIndex = (int)backfaceMode.floatValue;
-        if (modeIndex == 1) // Alpha
+        var backfaceCullMode = (BackfaceCullMode)(int)backfaceMode.floatValue;
+        if (backfaceCullMode == BackfaceCullMode.Alpha)
         {
             Draw("_BackfaceCullMin");
             Draw("_BackfaceCullMax");
-        } else if (modeIndex == 2) // Discard
-          {
+        }
+        else if (backfaceCullMode == BackfaceCullMode.Discard)
+        {
             Draw("_BackfaceCullThreshold");
         }
+        EditorGUILayout.Space();
+
+        // --- Dist Fade ---
+        EditorGUILayout.LabelField(new GUIContent("Dist Fade  ⓘ",
+            "Fades out pixels that failed to converge within the max ray march steps. " +
+            "The fade range is based on the final distance reached."),
+            EditorStyles.boldLabel);
+        var distFadeProp = FindProperty("_MinDistFadeMode", properties);
+        editor.ShaderProperty(distFadeProp, distFadeProp.displayName);
+        if ((MinDistFadeMode)(int)distFadeProp.floatValue == MinDistFadeMode.Enabled)
+        {
+            Draw("_DistFadeMin");
+            Draw("_DistFadeMax");
+        }
+        EditorGUILayout.Space();
 
         // --- Voxel Acceleration ---
         EditorGUILayout.LabelField("Voxel Acceleration", EditorStyles.boldLabel);
-        var voxelMode = FindProperty("_VoxelMode", properties);
-        editor.ShaderProperty(voxelMode, voxelMode.displayName);
-        if ((int)voxelMode.floatValue != 0) // not Off
+        var voxelModeProp = FindProperty("_VoxelMode", properties);
+        editor.ShaderProperty(voxelModeProp, voxelModeProp.displayName);
+        var voxelModeVal = (VoxelMode)(int)voxelModeProp.floatValue;
+        if (voxelModeVal != VoxelMode.Off)
         {
             Draw("_VoxelFilter");
         }
-        if ((int)voxelMode.floatValue == 1) // Accel only
+        if (voxelModeVal == VoxelMode.AccelOnly)
         {
             Draw("_MinSdfSteps");
         }

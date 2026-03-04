@@ -53,8 +53,8 @@ MonoBehaviour:
     probeSamplingDebugTexture: {fileID: 0}
     probeVolumeBlendStatesCS: {fileID: 0}
   m_RendererFeatures:
-  - {fileID: -8212785925503338661}
-  m_RendererFeatureMap: 5bb70bc6b652068e
+  - {fileID: 1437799433413829715}
+  m_RendererFeatureMap: 53a4e386f716f413
   m_UseNativeRenderPass: 0
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -83,3 +83,16 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 1
+--- !u!114 &1437799433413829715
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 08c721699e799426fa3d047530de0727, type: 3}
+  m_Name: ProgressiveRefinementFeature
+  m_EditorClassIdentifier: Assembly-CSharp::ProgressiveRefinementFeature
+  m_Active: 1

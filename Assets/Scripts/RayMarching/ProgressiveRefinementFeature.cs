@@ -45,10 +45,6 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
 
     readonly Dictionary<int, CameraState> m_CameraStates = new Dictionary<int, CameraState>();
 
-    // Exposed for SdfDepthDebugDisplay.
-    [System.NonSerialized] public RenderTexture debugPrevTex;
-    [System.NonSerialized] public RenderTexture debugCurrTex;
-
     // Frame counter set when SdfScene.Rebuilt fires — used to invalidate caches
     // for one frame after any SDF geometry change.
     int m_SceneDirtyFrame = -1;
@@ -126,14 +122,6 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
 
         state.sdfMrtPass.Setup(state.currHandle, state.prevHandle);
         state.copyToPrevPass.Setup(state.currHandle, state.prevHandle, invalidate);
-
-        // Expose for SdfDepthDebugDisplay — game camera only so the scene view
-        // camera doesn't overwrite these references after the game camera sets them.
-        if (cam.cameraType == CameraType.SceneView)
-        {
-            debugPrevTex = state.prevHandle?.rt;
-            debugCurrTex = state.currHandle?.rt;
-        }
 
         renderer.EnqueuePass(state.sdfMrtPass);
         renderer.EnqueuePass(state.copyToPrevPass);

@@ -4,13 +4,15 @@ Shader "RayMarchScene" {
         _Tint ("Tint", Color) = (1, 1, 1, 1)
         [IntRange] _MaxSteps ("Max Steps", Range(1, 200)) = 50
         _MaxDist ("Max Dist", Range(1, 1000)) = 100
-        _SurfDist ("Surf Dist", Range(0.00001, 0.1)) = 0.001
         _NormalDist ("Normal Dist", Range(0.00001, 0.1)) = 0.01
         _StepFactor ("Step Factor", Range(0.5, 1.0)) = 1.0
         [KeywordEnum(Disabled, Alpha, Discard)] _BackfaceCullMode ("Backface Cull Mode", Float) = 1
         _BackfaceCullMin ("Backface Cull Min", Range(0, 1.0)) = 0.1
         _BackfaceCullMax ("Backface Cull Max", Range(0, 1.0)) = 0.5
         _BackfaceCullThreshold ("Backface Cull Threshold", Range(0.0, 1.0)) = 0.0
+        [KeywordEnum(Disabled, Enabled)] _MinDistFadeMode ("Min Dist Fade Mode", Float) = 1
+        _DistFadeMin ("Dist Fade Min", Range(0, 0.2)) = 0.001
+        _DistFadeMax ("Dist Fade Max", Range(0, 0.2)) = 0.02
         [HideInInspector] _SdfNodeCount ("SdfNodeCount", Int) = 0
         [KeywordEnum(Off, Accel, Debug)] _VoxelMode      ("Voxel Mode",      Float) = 0
         [KeywordEnum(Point, Trilinear, Snap, Minecraft)] _VoxelFilter ("Voxel Filter", Float) = 0
@@ -42,6 +44,7 @@ Shader "RayMarchScene" {
             #pragma shader_feature _ PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
             #pragma multi_compile_instancing
             #pragma shader_feature_local _BACKFACECULLMODE_DISABLED _BACKFACECULLMODE_ALPHA _BACKFACECULLMODE_DISCARD
+            #pragma shader_feature_local _MINDISTFADEMODE_DISABLED _MINDISTFADEMODE_ENABLED
             #pragma shader_feature_local _VOXELMODE_OFF _VOXELMODE_ACCEL _VOXELMODE_DEBUG
             #pragma shader_feature_local _VOXELFILTER_POINT _VOXELFILTER_TRILINEAR _VOXELFILTER_SNAP _VOXELFILTER_MINECRAFT
             #pragma shader_feature_local _PROGRESSIVE_REFINEMENT_ON
@@ -80,12 +83,13 @@ Shader "RayMarchScene" {
                 float4 _MainTex_ST;
                 float4 _Tint;
                 float _MaxDist;
-                float _SurfDist;
                 float _NormalDist;
                 float _StepFactor;
                 float _BackfaceCullMin;
                 float _BackfaceCullMax;
                 float _BackfaceCullThreshold;
+                float _DistFadeMin;
+                float _DistFadeMax;
                 int _MaxSteps;
                 int _MinSdfSteps;
                 int _SdfNodeCount;
@@ -208,7 +212,7 @@ Shader "RayMarchScene" {
 
                     float3 uvw  = (float3(cell.x, cell.y, cell.z) + 0.5) * invN;
                     float  dist = SAMPLE_TEXTURE3D_LOD(_VoxelTex, sampler_point_clamp, uvw, 0).r;
-                    if (dist < _SurfDist)
+                    if (dist <= 0)
                     {
                         // Entered a solid cell.  The face we crossed is the entry face;
                         // its outward normal opposes the ray direction on the winning axis.
@@ -239,7 +243,8 @@ Shader "RayMarchScene" {
             }
 #endif
 
-            float RayMarch(float3 ro, float3 rd, float dO) {
+            float RayMarch(float3 ro, float3 rd, float dO, out float minDist) {
+                minDist = _MaxDist;
                 [loop]
                 for (int i = 0; i < _MaxSteps; i++) {
                     float3 p = ro + dO * rd;
@@ -249,7 +254,7 @@ Shader "RayMarchScene" {
                     if (voxDist >= 0) {
 #if defined(_VOXELMODE_DEBUG)
                         // Sphere-trace using the interpolated voxel value directly.
-                        if (voxDist < _SurfDist) break;
+                        if (voxDist < dO * 1e-6) break;
                         dO += voxDist * _StepFactor;
                         if (dO > _MaxDist) break;
                         continue;
@@ -271,7 +276,10 @@ Shader "RayMarchScene" {
 #endif
 
                     float dS = GetDistanceToScene(p);
-                    if (dS < _SurfDist || dO > _MaxDist) break;
+                    minDist = min(minDist, dS);
+                    // Break on max dist or precision lock (dS too small relative to dO to make progress).
+                    // 1e-6 is a safety margin above float epsilon (~1.19e-7).
+                    if (dO > _MaxDist || dS < dO * 1e-6) break;
                     dO += dS * _StepFactor;
                 }
                 return dO;
@@ -294,8 +302,8 @@ Shader "RayMarchScene" {
 
                 float3 ro = i.ro;
                 float3 rd = normalize(i.hitPos - ro);
+                float minDist = _MaxDist;
 #if defined(_PROGRESSIVE_REFINEMENT_ON)
-                // todo better visualize what's happening here and why it's not speeding things up at all
                 float dO = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, screenUV).r;
 #else
                 float dO = 0;
@@ -305,7 +313,7 @@ Shader "RayMarchScene" {
                 float3 faceNormal;
                 float d = RayMarchDDA(ro, rd, faceNormal);
 #else
-                float d = RayMarch(ro, rd, dO);
+                float d = RayMarch(ro, rd, dO, minDist);
 #endif
                 float4 col;
 
@@ -333,8 +341,7 @@ Shader "RayMarchScene" {
 #endif
 
                 SdfMaterial mat = GetMaterialAtScene(p);
-                col.rgb = SdfLighting(p, normalWS, clipSpacePos, mat, half4(_Tint)).rgb;
-                col.a = 1;
+                col = SdfLighting(p, normalWS, clipSpacePos, mat, half4(_Tint));
 
                 float ndotv = dot(normalWS, rd);
 #if defined(_BACKFACECULLMODE_DISCARD)
@@ -345,6 +352,9 @@ Shader "RayMarchScene" {
                 };
 #elif defined(_BACKFACECULLMODE_ALPHA)
                 col.a *= 1 - smoothstep(_BackfaceCullMin, _BackfaceCullMax, ndotv);
+#endif
+#if defined(_MINDISTFADEMODE_ENABLED)
+                col.a *= smoothstep(_DistFadeMax, _DistFadeMin, minDist);
 #endif
 
                 color = saturate(col);
