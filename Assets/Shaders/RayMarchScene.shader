@@ -73,11 +73,11 @@ Shader "RayMarchScene" {
             SAMPLER(sampler_point_clamp);
             SAMPLER(sampler_linear_clamp);
 
-            // Temporal warm-start globals (set by TemporalWarmStartFeature each frame).
-            TEXTURE2D(_PrevSdfDepthTex);
-            // UAV for depth capture — written via SetRandomWriteTarget(1, currHandle).
+            // Progressive refinement globals (set by ProgressiveRefinementFeature each frame).
+            TEXTURE2D(_PrevSdfDistTex);
+            // UAV for ray march distance capture — written via SetRandomWriteTarget(1, currHandle).
             // Avoids MRT slot routing issues on Metal by bypassing framebuffer attachment.
-            RWTexture2D<float> _CurrSdfDepthTex : register(u1);
+            RWTexture2D<float> _CurrSdfDistTex : register(u1);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
@@ -304,7 +304,7 @@ Shader "RayMarchScene" {
                 float3 rd = normalize(i.hitPos - ro);
                 float minDist = _MaxDist;
 #if defined(_PROGRESSIVE_REFINEMENT_ON)
-                float dO = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, screenUV).r;
+                float dO = SAMPLE_TEXTURE2D(_PrevSdfDistTex, sampler_point_clamp, screenUV).r;
 #else
                 float dO = 0;
 #endif
@@ -319,7 +319,7 @@ Shader "RayMarchScene" {
 
                 if (d > _MaxDist) {
                     col.a = 0;
-                    _CurrSdfDepthTex[uint2(i.vertex.xy)] = d;
+                    _CurrSdfDistTex[uint2(i.vertex.xy)] = d;
                     return;
                 }
 
@@ -327,10 +327,10 @@ Shader "RayMarchScene" {
                 float4 clipSpacePos = TransformWorldToHClip(p);
 
 #if defined(_TEMPORALDEBUG_NDC)
-                float prevDist = SAMPLE_TEXTURE2D(_PrevSdfDepthTex, sampler_point_clamp, screenUV).r;
+                float prevDist = SAMPLE_TEXTURE2D(_PrevSdfDistTex, sampler_point_clamp, screenUV).r;
                 depth = clipSpacePos.z / clipSpacePos.w;
                 color = float4(prevDist, prevDist, prevDist, 1.0);
-                _CurrSdfDepthTex[uint2(i.vertex.xy)] = d;
+                _CurrSdfDistTex[uint2(i.vertex.xy)] = d;
                 return;
 #endif
 
@@ -347,7 +347,7 @@ Shader "RayMarchScene" {
 #if defined(_BACKFACECULLMODE_DISCARD)
                 if (ndotv > _BackfaceCullThreshold) {
                     col.a = 0;
-                    _CurrSdfDepthTex[uint2(i.vertex.xy)] = d;
+                    _CurrSdfDistTex[uint2(i.vertex.xy)] = d;
                     return;
                 };
 #elif defined(_BACKFACECULLMODE_ALPHA)
@@ -359,7 +359,7 @@ Shader "RayMarchScene" {
 
                 color = saturate(col);
                 depth = clipSpacePos.z / clipSpacePos.w;
-                _CurrSdfDepthTex[uint2(i.vertex.xy)] = d;
+                _CurrSdfDistTex[uint2(i.vertex.xy)] = d;
             }
             ENDHLSL
         }

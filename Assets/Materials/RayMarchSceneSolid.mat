@@ -108,6 +108,8 @@ Material:
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
+    - _DistFadeMax: 0.02
+    - _DistFadeMin: 0.001
     - _DstBlend: 0
     - _EnvironmentReflections: 1
     - _GlossMapScale: 0
@@ -115,7 +117,7 @@ Material:
     - _GlossyReflections: 0
     - _MarchMode: 0
     - _MaxDist: 100
-    - _MaxSteps: 100
+    - _MaxSteps: 11
     - _Metallic: 0
     - _MinDistFadeMax: 0.02
     - _MinDistFadeMin: 0.001

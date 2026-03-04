@@ -1,5 +1,5 @@
 // Displays an R32_SFloat render texture as a grayscale image.
-// Assign to a quad material to visualise _PrevSdfDepthTex or any depth capture RT.
+// Assign to a quad material to visualise _PrevSdfDistTex or any R32_SFloat capture RT.
 Shader "Debug/DepthTex"
 {
     Properties
