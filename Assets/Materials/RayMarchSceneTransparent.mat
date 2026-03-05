@@ -12,7 +12,8 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - _PROGRESSIVE_COLOR_ON
+  - _MINDISTFADEMODE_ENABLED
+  - _PROGRESSIVE_REFINEMENT_ON
   - _VOXELFILTER_MINECRAFT
   - _VOXELMODE_OFF
   m_InvalidKeywords:
