@@ -2,8 +2,6 @@ using UnityEditor;
 using UnityEngine;
 
 public class RayMarchMaterialEditor : ShaderGUI {
-    enum VoxelMode { Off = 0, AccelOnly = 1, Full = 2 }
-
     public override void OnGUI(MaterialEditor editor, MaterialProperty[] properties) {
         void Draw(string name) {
             var p = FindProperty(name, properties);
@@ -64,21 +62,6 @@ public class RayMarchMaterialEditor : ShaderGUI {
                     m.DisableKeyword("_MINDISTFADEMODE_ENABLED");
                 }
             }
-        }
-        EditorGUILayout.Space();
-
-        // --- Voxel Acceleration ---
-        EditorGUILayout.LabelField("Voxel Acceleration", EditorStyles.boldLabel);
-        var voxelModeProp = FindProperty("_VoxelMode", properties);
-        editor.ShaderProperty(voxelModeProp, voxelModeProp.displayName);
-        var voxelModeVal = (VoxelMode)(int)voxelModeProp.floatValue;
-        if (voxelModeVal != VoxelMode.Off)
-        {
-            Draw("_VoxelFilter");
-        }
-        if (voxelModeVal == VoxelMode.AccelOnly)
-        {
-            Draw("_MinSdfSteps");
         }
         EditorGUILayout.Space();
 
