@@ -12,10 +12,8 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - _MINDISTFADEMODE_ENABLED
   - _PROGRESSIVE_COLOR_ON
-  - _PROGRESSIVE_REFINEMENT_ON
-  - _VOXELFILTER_POINT
+  - _VOXELFILTER_MINECRAFT
   - _VOXELMODE_OFF
   m_InvalidKeywords:
   - _BACKFACECULLMODE_ALPHA
@@ -142,7 +140,7 @@ Material:
     - _Surface: 0
     - _TemporalDebug: 0
     - _VoxelCellSize: 0.1
-    - _VoxelFilter: 0
+    - _VoxelFilter: 3
     - _VoxelMode: 0
     - _VoxelResolution: 64
     - _WorkflowMode: 1
@@ -152,7 +150,7 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _Tint: {r: 0.7294118, g: 0.8745098, b: 1, a: 0.5254902}
+    - _Tint: {r: 0.7294118, g: 0.8745098, b: 1, a: 0.5294118}
     - _TorusPosition: {r: 0, g: 0, b: 0, a: 1}
     - _VoxelOrigin: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []

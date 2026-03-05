@@ -320,10 +320,9 @@ Shader "RayMarchScene" {
 #else
                 float d = RayMarch(ro, rd, dO, minDist);
 #endif
-                float4 col;
 
                 if (d > _MaxDist) {
-                    col.a = 0;
+                    color.a = 0;
                     _CurrSdfDistTex[uint2(i.vertex.xy)] = d;
                     _CurrSdfColorTex[uint2(i.vertex.xy)] = float4(0, 0, 0, 0);
                     return;
@@ -339,12 +338,12 @@ Shader "RayMarchScene" {
 #endif
 
                 SdfMaterial mat = GetMaterialAtScene(p);
-                col = SdfLighting(p, normalWS, clipSpacePos, mat, half4(_Tint));
+                color = SdfLighting(p, normalWS, clipSpacePos, mat, half4(_Tint));
 
 #if defined(_MINDISTFADEMODE_ENABLED)
-                col.a *= smoothstep(_DistFadeMax, _DistFadeMin, minDist);
+                color.a *= smoothstep(_DistFadeMax, _DistFadeMin, minDist);
 #endif
-                color = saturate(col);
+                color = saturate(color);
 #if defined(_PROGRESSIVE_COLOR_ON)
                 float4 prevColor = SAMPLE_TEXTURE2D(_PrevSdfColorTex, sampler_point_clamp, screenUV);
                 color.rgb = color.a * color.rgb + prevColor.rgb * (1.0 - color.a);
