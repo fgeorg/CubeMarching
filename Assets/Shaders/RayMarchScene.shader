@@ -54,6 +54,7 @@ Shader "RayMarchScene" {
             SAMPLER(sampler_point_clamp);
 
             // Progressive refinement globals (set by ProgressiveRefinementFeature each frame).
+            float4x4 _SdfPrevViewProjMatrix;
             TEXTURE2D(_PrevSdfDistTex);
             // UAV for ray march distance capture — written via SetRandomWriteTarget(1, currHandle).
             // Avoids MRT slot routing issues on Metal by bypassing framebuffer attachment.
@@ -172,8 +173,14 @@ Shader "RayMarchScene" {
 #endif
                 color = saturate(color);
 #if defined(_PROGRESSIVE_COLOR_ON)
-                float4 prevColor = SAMPLE_TEXTURE2D(_PrevSdfColorTex, sampler_point_clamp, screenUV);
-                color.rgb = color.a * color.rgb + prevColor.rgb * (1.0 - color.a);
+                float4 prevClip = mul(_SdfPrevViewProjMatrix, float4(p, 1.0));
+                float2 prevUV = prevClip.w > 0.0
+                    ? float2(prevClip.x, prevClip.y * _ProjectionParams.x) / prevClip.w * 0.5 + 0.5
+                    : screenUV;
+                float4 prevColor = SAMPLE_TEXTURE2D(_PrevSdfColorTex, sampler_point_clamp, prevUV);
+                // alpha blend with the previous frame, but normalize to the material's transparency
+                float t = color.a / _Tint.a;
+                color.rgb = t * color.rgb + prevColor.rgb * (1.0 - t);
                 color.a = max(color.a, prevColor.a);
 #endif
                 depth = clipSpacePos.z / clipSpacePos.w;

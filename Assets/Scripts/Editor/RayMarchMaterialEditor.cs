@@ -24,7 +24,12 @@ public class RayMarchMaterialEditor : ShaderGUI {
             if (EditorGUI.EndChangeCheck())
                 p.floatValue = Mathf.Clamp(newVal, min, max);
         }
+        EditorGUI.BeginChangeCheck();
         Draw("_Tint");
+        if (EditorGUI.EndChangeCheck())
+        {
+            ProgressiveRefinementFeature.InvalidateColorBuffers();
+        }
         EditorGUILayout.Space();
 
         // --- Ray March ---

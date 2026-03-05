@@ -116,7 +116,7 @@ Material:
     - _GlossyReflections: 0
     - _MarchMode: 0
     - _MaxDist: 100
-    - _MaxSteps: 10
+    - _MaxSteps: 50
     - _Metallic: 0
     - _MinDistFadeMax: 0.02
     - _MinDistFadeMin: 0.001

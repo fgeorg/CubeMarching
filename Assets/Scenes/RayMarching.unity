@@ -522,7 +522,7 @@ MonoBehaviour:
   _sdfScene: {fileID: 1194525269}
   _voxelBakeShader: {fileID: 7200000, guid: 0f649a8f48a94447898caea6d794c6de, type: 3}
   _enableVoxelAccel: 1
-  _voxelResolution: 75
+  _voxelResolution: 256
   _voxelCenter: {x: 0, y: 0, z: 0}
   _voxelExtent: 10
 --- !u!4 &1263431985

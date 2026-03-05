@@ -14,53 +14,58 @@ using UnityEngine.Rendering.Universal;
 //   2. Enable _PROGRESSIVE_REFINEMENT_ON on the SDF material.
 //   3. The SDF shader must use LightMode = "SdfMrt".
 [ExecuteInEditMode]
-public class ProgressiveRefinementFeature : ScriptableRendererFeature
-{
+public class ProgressiveRefinementFeature : ScriptableRendererFeature {
     const int BufferCount = 2;
 
-    class CameraState
-    {
+    class CameraState {
         public RTHandle[] distanceBufferHandles = new RTHandle[BufferCount];
         public RTHandle[] colorBufferHandles = new RTHandle[BufferCount];
-        public int        bufferIndex;
-        public bool       sceneDirty;      // set by OnSdfSceneRebuilt, consumed in AddRenderPasses
-        public Matrix4x4  prevViewMatrix;  // used to detect camera movement
+        public int bufferIndex;
+        public bool sceneDirty;          // set by OnSdfSceneRebuilt, consumed in AddRenderPasses
+        public bool colorDirty;          // set by OnColorBuffersInvalidated, consumed in AddRenderPasses
+        public Matrix4x4 prevViewMatrix;      // used to detect camera movement
+        public Matrix4x4 prevViewProjMatrix;  // passed to shader for color reprojection
+        public bool initialized;
         // Per-camera instances — a shared instance's Setup() gets overwritten because
         // AddRenderPasses runs for all cameras before RecordRenderGraph runs for any.
         public SdfMrtPass sdfMrtPass;
     }
 
+    public static event System.Action ColorBuffersInvalidated;
+    public static void InvalidateColorBuffers() => ColorBuffersInvalidated?.Invoke();
+
     readonly Dictionary<int, CameraState> m_CameraStates = new Dictionary<int, CameraState>();
 
-    public override void Create()
-    {
+    public override void Create() {
     }
 
-    void OnEnable()
-    {
+    void OnEnable() {
         SdfScene.Rebuilt += OnSdfSceneRebuilt;
+        ColorBuffersInvalidated += OnColorBuffersInvalidated;
     }
 
-    void OnDisable()
-    {
+    void OnDisable() {
         SdfScene.Rebuilt -= OnSdfSceneRebuilt;
+        ColorBuffersInvalidated -= OnColorBuffersInvalidated;
     }
 
-    void OnSdfSceneRebuilt()
-    {
-        foreach (CameraState state in m_CameraStates.Values)
-        {
+    void OnSdfSceneRebuilt() {
+        foreach (CameraState state in m_CameraStates.Values) {
             state.sceneDirty = true;
         }
     }
 
-    public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
-    {
-        Camera cam   = renderingData.cameraData.camera;
-        int    camId = cam.GetInstanceID();
+    void OnColorBuffersInvalidated() {
+        foreach (CameraState state in m_CameraStates.Values) {
+            state.colorDirty = true;
+        }
+    }
 
-        if (!m_CameraStates.TryGetValue(camId, out CameraState state))
-        {
+    public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData) {
+        Camera cam = renderingData.cameraData.camera;
+        int camId = cam.GetInstanceID();
+
+        if (!m_CameraStates.TryGetValue(camId, out CameraState state)) {
             SdfMrtPass sdfMrtPass = new SdfMrtPass();
             sdfMrtPass.renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
             state = new CameraState { sdfMrtPass = sdfMrtPass };
@@ -69,13 +74,12 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
 
         // Realloc per-camera handles if resolution changed.
         RenderTextureDescriptor desc = renderingData.cameraData.cameraTargetDescriptor;
-        desc.msaaSamples       = 1;
-        desc.depthBufferBits   = 0;
-        desc.graphicsFormat    = GraphicsFormat.R32_SFloat;
+        desc.msaaSamples = 1;
+        desc.depthBufferBits = 0;
+        desc.graphicsFormat = GraphicsFormat.R32_SFloat;
         desc.enableRandomWrite = true; // both handles need UAV (each acts as curr and prev)
 
-        for (int i = 0; i < BufferCount; i++)
-        {
+        for (int i = 0; i < BufferCount; i++) {
             RTHandle h = state.distanceBufferHandles[i];
             RenderingUtils.ReAllocateHandleIfNeeded(ref h, desc,
                 FilterMode.Point, TextureWrapMode.Clamp, name: $"_dist_buffer_{i}");
@@ -83,11 +87,10 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
         }
 
         RenderTextureDescriptor colorDesc = desc;
-        colorDesc.graphicsFormat    = GraphicsFormat.R16G16B16A16_SFloat;
+        colorDesc.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
         colorDesc.enableRandomWrite = true;
 
-        for (int i = 0; i < BufferCount; i++)
-        {
+        for (int i = 0; i < BufferCount; i++) {
             RTHandle h = state.colorBufferHandles[i];
             RenderingUtils.ReAllocateHandleIfNeeded(ref h, colorDesc,
                 FilterMode.Point, TextureWrapMode.Clamp, name: $"_color_buffer_{i}");
@@ -100,26 +103,33 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
         int currIdx = state.bufferIndex;
 
         Matrix4x4 currViewMatrix = cam.worldToCameraMatrix;
-        bool invalidate      = currViewMatrix != state.prevViewMatrix || state.sceneDirty;
-        state.sceneDirty     = false;
+        bool invalidate = currViewMatrix != state.prevViewMatrix || state.sceneDirty || state.colorDirty;
+        bool invalidateColor = state.colorDirty;
+        state.sceneDirty = false;
+        state.colorDirty = false;
         state.prevViewMatrix = currViewMatrix;
 
+        Matrix4x4 proj = GL.GetGPUProjectionMatrix(cam.projectionMatrix, true);
+        Matrix4x4 currViewProj = proj * cam.worldToCameraMatrix;
+        if (!state.initialized) {
+            state.prevViewProjMatrix = currViewProj;
+            state.initialized = true;
+        }
+
         state.sdfMrtPass.Setup(state.distanceBufferHandles[currIdx], state.distanceBufferHandles[prevIdx],
-                               state.colorBufferHandles[currIdx], state.colorBufferHandles[prevIdx], invalidate);
+                               state.colorBufferHandles[currIdx], state.colorBufferHandles[prevIdx],
+                               invalidate, invalidateColor, state.prevViewProjMatrix);
+        state.prevViewProjMatrix = currViewProj;
 
         renderer.EnqueuePass(state.sdfMrtPass);
     }
 
-    protected override void Dispose(bool disposing)
-    {
-        foreach (CameraState state in m_CameraStates.Values)
-        {
-            foreach (RTHandle h in state.distanceBufferHandles)
-            {
+    protected override void Dispose(bool disposing) {
+        foreach (CameraState state in m_CameraStates.Values) {
+            foreach (RTHandle h in state.distanceBufferHandles) {
                 h?.Release();
             }
-            foreach (RTHandle h in state.colorBufferHandles)
-            {
+            foreach (RTHandle h in state.colorBufferHandles) {
                 h?.Release();
             }
         }
@@ -128,59 +138,59 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
 
     // Binds _PrevSdfDistTex (last frame's distances), draws SDF, UAV-writes
     // this frame's distances into currHandle. Reprojection uses UNITY_MATRIX_I_VP.
-    class SdfMrtPass : ScriptableRenderPass
-    {
-        static readonly ShaderTagId s_SdfMrtTag        = new("SdfMrt");
-        static readonly int         s_PrevSdfDistTexId  = Shader.PropertyToID("_PrevSdfDistTex");
-        static readonly int         s_PrevSdfColorTexId = Shader.PropertyToID("_PrevSdfColorTex");
+    class SdfMrtPass : ScriptableRenderPass {
+        static readonly ShaderTagId s_SdfMrtTag = new("SdfMrt");
+        static readonly int s_PrevSdfDistTexId = Shader.PropertyToID("_PrevSdfDistTex");
+        static readonly int s_PrevSdfColorTexId = Shader.PropertyToID("_PrevSdfColorTex");
+        static readonly int s_SdfPrevViewProjMatrixId = Shader.PropertyToID("_SdfPrevViewProjMatrix");
 
         RTHandle m_CurrHandle;
         RTHandle m_PrevHandle;
         RTHandle m_CurrColorHandle;
         RTHandle m_PrevColorHandle;
-        bool     m_Invalidate;
+        bool m_Invalidate;
+        bool m_InvalidateColor;
+        Matrix4x4 m_SdfPrevViewProjMatrix;
 
         public void Setup(RTHandle currHandle, RTHandle prevHandle,
-                          RTHandle currColorHandle, RTHandle prevColorHandle, bool invalidate)
-        {
-            m_CurrHandle      = currHandle;
-            m_PrevHandle      = prevHandle;
+                          RTHandle currColorHandle, RTHandle prevColorHandle,
+                          bool invalidate, bool invalidateColor, Matrix4x4 prevViewProjMatrix) {
+            m_CurrHandle = currHandle;
+            m_PrevHandle = prevHandle;
             m_CurrColorHandle = currColorHandle;
             m_PrevColorHandle = prevColorHandle;
-            m_Invalidate      = invalidate;
+            m_Invalidate = invalidate;
+            m_InvalidateColor = invalidateColor;
+            m_SdfPrevViewProjMatrix = prevViewProjMatrix;
         }
 
-        class PassData
-        {
+        class PassData {
             public RendererListHandle rendererList;
-            public TextureHandle      colorTarget;
-            public TextureHandle      depthTarget;
-            public RenderTexture      currRT;
-            public TextureHandle      prevDist;
-            public RenderTexture      currColorRT;
-            public TextureHandle      prevColor;
+            public TextureHandle colorTarget;
+            public TextureHandle depthTarget;
+            public RenderTexture currRT;
+            public TextureHandle prevDist;
+            public RenderTexture currColorRT;
+            public TextureHandle prevColor;
+            public Matrix4x4 prevViewProjMatrix;
         }
 
-        public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
-        {
-            var resourceData  = frameData.Get<UniversalResourceData>();
+        public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData) {
+            var resourceData = frameData.Get<UniversalResourceData>();
             var renderingData = frameData.Get<UniversalRenderingData>();
-            var cameraData    = frameData.Get<UniversalCameraData>();
+            var cameraData = frameData.Get<UniversalCameraData>();
 
-            if (!resourceData.activeColorTexture.IsValid() || !resourceData.cameraDepth.IsValid())
-            {
+            if (!resourceData.activeColorTexture.IsValid() || !resourceData.cameraDepth.IsValid()) {
                 return;
             }
 
-            SortingSettings sortSettings = new SortingSettings(cameraData.camera)
-            {
+            SortingSettings sortSettings = new SortingSettings(cameraData.camera) {
                 criteria = SortingCriteria.CommonTransparent
             };
-            DrawingSettings drawSettings = new DrawingSettings(s_SdfMrtTag, sortSettings)
-            {
+            DrawingSettings drawSettings = new DrawingSettings(s_SdfMrtTag, sortSettings) {
                 enableDynamicBatching = renderingData.supportsDynamicBatching,
-                enableInstancing      = true,
-                perObjectData         = PerObjectData.ReflectionProbes | PerObjectData.OcclusionProbe
+                enableInstancing = true,
+                perObjectData = PerObjectData.ReflectionProbes | PerObjectData.OcclusionProbe
             };
             FilteringSettings filterSettings = new FilteringSettings(RenderQueueRange.transparent);
 
@@ -188,7 +198,7 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
                 renderingData.cullResults, drawSettings, filterSettings);
             RendererListHandle sdfList = renderGraph.CreateRendererList(listParams);
 
-            TextureHandle currDistHandle  = renderGraph.ImportTexture(m_CurrHandle);
+            TextureHandle currDistHandle = renderGraph.ImportTexture(m_CurrHandle);
             TextureHandle currColorHandle = renderGraph.ImportTexture(m_CurrColorHandle);
 
             // Use blackTexture when invalidated so the shader doesn't reproject stale data.
@@ -196,17 +206,19 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
                 ? renderGraph.defaultResources.blackTexture
                 : renderGraph.ImportTexture(m_PrevHandle);
 
-            TextureHandle prevColorHandle = renderGraph.ImportTexture(m_PrevColorHandle);
+            TextureHandle prevColorHandle = m_InvalidateColor
+                ? renderGraph.defaultResources.blackTexture
+                : renderGraph.ImportTexture(m_PrevColorHandle);
 
-            using (var builder = renderGraph.AddUnsafePass<PassData>("SdfMrtPass", out PassData passData))
-            {
+            using (var builder = renderGraph.AddUnsafePass<PassData>("SdfMrtPass", out PassData passData)) {
                 passData.rendererList = sdfList;
-                passData.colorTarget  = resourceData.activeColorTexture;
-                passData.depthTarget  = resourceData.cameraDepth;
-                passData.currRT       = m_CurrHandle.rt;
-                passData.prevDist     = prevDistHandle;
-                passData.currColorRT  = m_CurrColorHandle.rt;
-                passData.prevColor    = prevColorHandle;
+                passData.colorTarget = resourceData.activeColorTexture;
+                passData.depthTarget = resourceData.cameraDepth;
+                passData.currRT = m_CurrHandle.rt;
+                passData.prevDist = prevDistHandle;
+                passData.currColorRT = m_CurrColorHandle.rt;
+                passData.prevColor = prevColorHandle;
+                passData.prevViewProjMatrix = m_SdfPrevViewProjMatrix;
 
                 builder.UseTexture(resourceData.activeColorTexture, AccessFlags.ReadWrite);
                 builder.UseTexture(resourceData.cameraDepth, AccessFlags.ReadWrite);
@@ -218,11 +230,11 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature
 
                 builder.AllowGlobalStateModification(true);
 
-                builder.SetRenderFunc((PassData data, UnsafeGraphContext ctx) =>
-                {
+                builder.SetRenderFunc((PassData data, UnsafeGraphContext ctx) => {
                     // Must be set per-camera inside the render func, not in RecordRenderGraph.
-                    ctx.cmd.SetGlobalTexture(s_PrevSdfDistTexId,  data.prevDist);
+                    ctx.cmd.SetGlobalTexture(s_PrevSdfDistTexId, data.prevDist);
                     ctx.cmd.SetGlobalTexture(s_PrevSdfColorTexId, data.prevColor);
+                    ctx.cmd.SetGlobalMatrix(s_SdfPrevViewProjMatrixId, data.prevViewProjMatrix);
 
                     ctx.cmd.SetRenderTarget(
                         (RenderTargetIdentifier)data.colorTarget,
