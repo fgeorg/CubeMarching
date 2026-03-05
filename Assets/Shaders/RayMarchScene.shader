@@ -6,10 +6,7 @@ Shader "RayMarchScene" {
         _MaxDist ("Max Dist", Range(1, 1000)) = 100
         _NormalDist ("Normal Dist", Range(0.00001, 0.1)) = 0.01
         _StepFactor ("Step Factor", Range(0.5, 1.0)) = 1.0
-        [KeywordEnum(Disabled, Alpha)] _BackfaceCullMode ("Backface Cull Mode", Float) = 1
-        _BackfaceCullMin ("Backface Cull Min", Range(0, 1.0)) = 0.1
-        _BackfaceCullMax ("Backface Cull Max", Range(0, 1.0)) = 0.5
-        [KeywordEnum(Disabled, Enabled)] _MinDistFadeMode ("Min Dist Fade Mode", Float) = 1
+        [Toggle(_MINDISTFADEMODE_ENABLED)] _MinDistFadeMode ("Min Dist Fade Mode", Float) = 1
         _DistFadeMin ("Dist Fade Min", Range(0, 0.2)) = 0.001
         _DistFadeMax ("Dist Fade Max", Range(0, 0.2)) = 0.02
         [HideInInspector] _SdfNodeCount ("SdfNodeCount", Int) = 0
@@ -20,9 +17,6 @@ Shader "RayMarchScene" {
         [HideInInspector] _VoxelOrigin    ("Voxel Origin",    Vector) = (0,0,0,0)
         [HideInInspector] _VoxelCellSize  ("Voxel Cell Size", Float)  = 0.1
         [HideInInspector] _VoxelResolution("Voxel Resolution",Float)  = 64
-        // Off = normal rendering
-        // Ndc = show previous frame's depth texture as grayscale
-        [KeywordEnum(Off, Ndc)] _TemporalDebug ("Temporal Debug", Float) = 0
     }
     SubShader {
         Tags { "RenderType"="Transparent" "RenderPipeline"="UniversalRenderPipeline" "Queue"="Transparent" }
@@ -42,13 +36,10 @@ Shader "RayMarchScene" {
             #pragma shader_feature_local _ _MIXED_LIGHTING_SUBTRACTIVE
             #pragma shader_feature _ PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
             #pragma multi_compile_instancing
-            #pragma shader_feature_local _BACKFACECULLMODE_DISABLED _BACKFACECULLMODE_ALPHA
-            #pragma shader_feature_local _MINDISTFADEMODE_DISABLED _MINDISTFADEMODE_ENABLED
+            #pragma shader_feature_local _MINDISTFADEMODE_ENABLED
             #pragma shader_feature_local _VOXELMODE_OFF _VOXELMODE_ACCEL _VOXELMODE_DEBUG
             #pragma shader_feature_local _VOXELFILTER_POINT _VOXELFILTER_TRILINEAR _VOXELFILTER_SNAP _VOXELFILTER_MINECRAFT
-            #pragma shader_feature_local _PROGRESSIVE_REFINEMENT_ON
-            #pragma shader_feature _PROGRESSIVE_COLOR_ON
-            #pragma shader_feature_local _TEMPORALDEBUG_OFF _TEMPORALDEBUG_NDC
+            #pragma shader_feature_local _ _PROGRESSIVE_REFINEMENT_ON _PROGRESSIVE_COLOR_ON
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -88,8 +79,6 @@ Shader "RayMarchScene" {
                 float _MaxDist;
                 float _NormalDist;
                 float _StepFactor;
-                float _BackfaceCullMin;
-                float _BackfaceCullMax;
                 float _DistFadeMin;
                 float _DistFadeMax;
                 int _MaxSteps;
@@ -308,7 +297,8 @@ Shader "RayMarchScene" {
                 
 #if defined(_PROGRESSIVE_REFINEMENT_ON)
                 float dO = SAMPLE_TEXTURE2D(_PrevSdfDistTex, sampler_point_clamp, screenUV).r;
-#if defined(_PROGRESSIVE_COLOR_ON)
+#elif defined(_PROGRESSIVE_COLOR_ON)
+                float dO = SAMPLE_TEXTURE2D(_PrevSdfDistTex, sampler_point_clamp, screenUV).r;
                 float3 oldP = ro + dO * rd;
 
                 if (abs(GetDistanceToScene(oldP) < dO * 1e-6)) {
@@ -320,7 +310,6 @@ Shader "RayMarchScene" {
                     return;
                 }
                 _CurrSdfColorTex[uint2(i.vertex.xy)] = float4(0, 0, 0, 0);
-#endif
 #else
                 float dO = 0;
 #endif
@@ -343,14 +332,6 @@ Shader "RayMarchScene" {
                 float3 p = ro + d * rd;
                 float4 clipSpacePos = TransformWorldToHClip(p);
 
-#if defined(_TEMPORALDEBUG_NDC)
-                float prevDist = SAMPLE_TEXTURE2D(_PrevSdfDistTex, sampler_point_clamp, screenUV).r;
-                depth = clipSpacePos.z / clipSpacePos.w;
-                color = float4(prevDist, prevDist, prevDist, 1.0);
-                _CurrSdfDistTex[uint2(i.vertex.xy)] = d;
-                return;
-#endif
-
 #if defined(_VOXELMODE_DEBUG) && defined(_VOXELFILTER_MINECRAFT)
                 half3 normalWS = half3(faceNormal);
 #else
@@ -360,14 +341,9 @@ Shader "RayMarchScene" {
                 SdfMaterial mat = GetMaterialAtScene(p);
                 col = SdfLighting(p, normalWS, clipSpacePos, mat, half4(_Tint));
 
-                float ndotv = dot(normalWS, rd);
-#if defined(_BACKFACECULLMODE_ALPHA)
-                col.a *= 1 - smoothstep(_BackfaceCullMin, _BackfaceCullMax, ndotv);
-#endif
 #if defined(_MINDISTFADEMODE_ENABLED)
                 col.a *= smoothstep(_DistFadeMax, _DistFadeMin, minDist);
 #endif
-
                 color = saturate(col);
 #if defined(_PROGRESSIVE_COLOR_ON)
                 float4 prevColor = SAMPLE_TEXTURE2D(_PrevSdfColorTex, sampler_point_clamp, screenUV);

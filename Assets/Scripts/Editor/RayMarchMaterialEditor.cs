@@ -2,13 +2,9 @@ using UnityEditor;
 using UnityEngine;
 
 public class RayMarchMaterialEditor : ShaderGUI {
-    enum BackfaceCullMode { Off = 0, Alpha = 1 }
-    enum MinDistFadeMode  { Off = 0, Enabled = 1 }
-    enum VoxelMode        { Off = 0, AccelOnly = 1, Full = 2 }
+    enum VoxelMode { Off = 0, AccelOnly = 1, Full = 2 }
 
     public override void OnGUI(MaterialEditor editor, MaterialProperty[] properties) {
-        var backfaceMode = FindProperty("_BackfaceCullMode", properties);
-
         void Draw(string name) {
             var p = FindProperty(name, properties);
             editor.ShaderProperty(p, p.displayName);
@@ -41,30 +37,33 @@ public class RayMarchMaterialEditor : ShaderGUI {
         Draw("_StepFactor");
         EditorGUILayout.Space();
 
-        // --- Backface Culling ---
-        EditorGUILayout.LabelField("Backface Culling", EditorStyles.boldLabel);
-        editor.ShaderProperty(backfaceMode, backfaceMode.displayName);
-        EditorGUILayout.Space();
-
-        var backfaceCullMode = (BackfaceCullMode)(int)backfaceMode.floatValue;
-        if (backfaceCullMode == BackfaceCullMode.Alpha)
-        {
-            Draw("_BackfaceCullMin");
-            Draw("_BackfaceCullMax");
-        }
-EditorGUILayout.Space();
-
         // --- Dist Fade ---
         EditorGUILayout.LabelField(new GUIContent("Dist Fade  ⓘ",
             "Fades out pixels that failed to converge within the max ray march steps. " +
             "The fade range is based on the final distance reached."),
             EditorStyles.boldLabel);
-        var distFadeProp = FindProperty("_MinDistFadeMode", properties);
-        editor.ShaderProperty(distFadeProp, distFadeProp.displayName);
-        if ((MinDistFadeMode)(int)distFadeProp.floatValue == MinDistFadeMode.Enabled)
+        bool distFadeOn = (editor.target as Material).IsKeywordEnabled("_MINDISTFADEMODE_ENABLED");
+        EditorGUI.BeginChangeCheck();
+        distFadeOn = EditorGUILayout.Toggle("Enabled", distFadeOn);
+        if (distFadeOn)
         {
             Draw("_DistFadeMin");
             Draw("_DistFadeMax");
+        }
+        if (EditorGUI.EndChangeCheck())
+        {
+            foreach (Object t in editor.targets)
+            {
+                Material m = t as Material;
+                if (distFadeOn)
+                {
+                    m.EnableKeyword("_MINDISTFADEMODE_ENABLED");
+                }
+                else
+                {
+                    m.DisableKeyword("_MINDISTFADEMODE_ENABLED");
+                }
+            }
         }
         EditorGUILayout.Space();
 
@@ -85,44 +84,32 @@ EditorGUILayout.Space();
 
         // --- Progressive Refinement ---
         EditorGUILayout.LabelField("Progressive Refinement", EditorStyles.boldLabel);
-        bool temporalOn = (editor.target as Material).IsKeywordEnabled("_PROGRESSIVE_REFINEMENT_ON");
+        Material mat0 = editor.target as Material;
+        bool temporalOn = mat0.IsKeywordEnabled("_PROGRESSIVE_REFINEMENT_ON") || mat0.IsKeywordEnabled("_PROGRESSIVE_COLOR_ON");
+        bool colorOn = mat0.IsKeywordEnabled("_PROGRESSIVE_COLOR_ON");
         EditorGUI.BeginChangeCheck();
-        temporalOn = EditorGUILayout.Toggle("Enabled (requires ProgressiveRefinementFeature)", temporalOn);
-        Draw("_TemporalDebug");
+        temporalOn = EditorGUILayout.Toggle("Enabled", temporalOn);
+        if (temporalOn)
+        {
+            colorOn = EditorGUILayout.Toggle("Use Previous Frame's Color", colorOn);
+        }
         if (EditorGUI.EndChangeCheck())
         {
             foreach (Object t in editor.targets)
             {
                 Material m = t as Material;
+                m.DisableKeyword("_PROGRESSIVE_REFINEMENT_ON");
+                m.DisableKeyword("_PROGRESSIVE_COLOR_ON");
                 if (temporalOn)
                 {
-                    m.EnableKeyword("_PROGRESSIVE_REFINEMENT_ON");
-                }
-                else
-                {
-                    m.DisableKeyword("_PROGRESSIVE_REFINEMENT_ON");
-                }
-            }
-        }
-        EditorGUILayout.Space();
-
-        // --- Progressive Color ---
-        EditorGUILayout.LabelField("Progressive Color", EditorStyles.boldLabel);
-        bool colorOn = (editor.target as Material).IsKeywordEnabled("_PROGRESSIVE_COLOR_ON");
-        EditorGUI.BeginChangeCheck();
-        colorOn = EditorGUILayout.Toggle("Enabled", colorOn);
-        if (EditorGUI.EndChangeCheck())
-        {
-            foreach (Object t in editor.targets)
-            {
-                Material m = t as Material;
-                if (colorOn)
-                {
-                    m.EnableKeyword("_PROGRESSIVE_COLOR_ON");
-                }
-                else
-                {
-                    m.DisableKeyword("_PROGRESSIVE_COLOR_ON");
+                    if (colorOn)
+                    {
+                        m.EnableKeyword("_PROGRESSIVE_COLOR_ON");
+                    }
+                    else
+                    {
+                        m.EnableKeyword("_PROGRESSIVE_REFINEMENT_ON");
+                    }
                 }
             }
         }

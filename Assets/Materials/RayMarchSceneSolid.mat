@@ -12,16 +12,14 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - _BACKFACECULLMODE_ALPHA
   - _MINDISTFADEMODE_ENABLED
   - _PROGRESSIVE_COLOR_ON
-  - _PROGRESSIVE_REFINEMENT_ON
-  - _TEMPORALDEBUG_OFF
   - _VOXELFILTER_MINECRAFT
   - _VOXELMODE_OFF
   m_InvalidKeywords:
   - _MARCHMODE_SIMPLE
   - _PRIMITIVEALBEDOMODE_INTERPOLATED
+  - _TEMPORALDEBUG_OFF
   - _TEMPORAL_WARMSTART_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -109,7 +107,7 @@ Material:
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
-    - _DistFadeMax: 0.01
+    - _DistFadeMax: 0.001
     - _DistFadeMin: 0
     - _DstBlend: 0
     - _EnvironmentReflections: 1

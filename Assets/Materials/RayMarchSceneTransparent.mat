@@ -12,15 +12,16 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - _BACKFACECULLMODE_ALPHA
   - _MINDISTFADEMODE_ENABLED
+  - _PROGRESSIVE_COLOR_ON
   - _PROGRESSIVE_REFINEMENT_ON
-  - _TEMPORALDEBUG_OFF
   - _VOXELFILTER_POINT
   - _VOXELMODE_OFF
   m_InvalidKeywords:
+  - _BACKFACECULLMODE_ALPHA
   - _MARCHMODE_SIMPLE
   - _PRIMITIVEALBEDOMODE_DISABLED
+  - _TEMPORALDEBUG_OFF
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -116,7 +117,7 @@ Material:
     - _GlossyReflections: 0
     - _MarchMode: 0
     - _MaxDist: 100
-    - _MaxSteps: 100
+    - _MaxSteps: 50
     - _Metallic: 0
     - _MinDistFadeMax: 0.02
     - _MinDistFadeMin: 0.001
