@@ -4,6 +4,10 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
+using UnityEditor.SceneManagement;
+#endif
 
 // Progressive (multiframe) refinement for SDF ray marching.
 // Per-camera buffers track ray march distances across frames.
@@ -42,12 +46,30 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature {
     void OnEnable() {
         SdfScene.Rebuilt += OnSdfSceneRebuilt;
         ColorBuffersInvalidated += OnColorBuffersInvalidated;
+        SceneManager.sceneLoaded += OnSceneLoaded;
+#if UNITY_EDITOR
+        EditorSceneManager.sceneOpened += OnEditorSceneOpened;
+#endif
     }
 
     void OnDisable() {
         SdfScene.Rebuilt -= OnSdfSceneRebuilt;
         ColorBuffersInvalidated -= OnColorBuffersInvalidated;
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+#if UNITY_EDITOR
+        EditorSceneManager.sceneOpened -= OnEditorSceneOpened;
+#endif
     }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode) {
+        ReleaseAllBuffers();
+    }
+
+#if UNITY_EDITOR
+    void OnEditorSceneOpened(Scene scene, OpenSceneMode mode) {
+        ReleaseAllBuffers();
+    }
+#endif
 
     void OnSdfSceneRebuilt() {
         foreach (CameraState state in m_CameraStates.Values) {
@@ -124,7 +146,7 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature {
         renderer.EnqueuePass(state.sdfMrtPass);
     }
 
-    protected override void Dispose(bool disposing) {
+    void ReleaseAllBuffers() {
         foreach (CameraState state in m_CameraStates.Values) {
             foreach (RTHandle h in state.distanceBufferHandles) {
                 h?.Release();
@@ -134,6 +156,10 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature {
             }
         }
         m_CameraStates.Clear();
+    }
+
+    protected override void Dispose(bool disposing) {
+        ReleaseAllBuffers();
     }
 
     // Binds _PrevSdfDistTex (last frame's distances), draws SDF, UAV-writes

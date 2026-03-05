@@ -6,9 +6,9 @@ Shader "RayMarchScene" {
         _MaxDist ("Max Dist", Range(1, 1000)) = 100
         _NormalDist ("Normal Dist", Range(0.00001, 0.1)) = 0.01
         _StepFactor ("Step Factor", Range(0.5, 1.0)) = 1.0
-        [Toggle(_MINDISTFADEMODE_ENABLED)] _MinDistFadeMode ("Min Dist Fade Mode", Float) = 1
-        _DistFadeMin ("Dist Fade Min", Range(0, 0.2)) = 0.001
-        _DistFadeMax ("Dist Fade Max", Range(0, 0.2)) = 0.02
+        [Toggle(_DISTFADEMODE_ENABLED)] _MinDistFadeMode ("Min Dist Fade Mode", Float) = 1
+        _DistFadeMin ("Dist Fade Min", Range(0, 0.1)) = 0
+        _DistFadeMax ("Dist Fade Max", Range(0, 0.1)) = 0.001
         [HideInInspector] _SdfNodeCount ("SdfNodeCount", Int) = 0
     }
     SubShader {
@@ -29,7 +29,7 @@ Shader "RayMarchScene" {
             #pragma shader_feature_local _ _MIXED_LIGHTING_SUBTRACTIVE
             #pragma shader_feature _ PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
             #pragma multi_compile_instancing
-            #pragma shader_feature_local _MINDISTFADEMODE_ENABLED
+            #pragma shader_feature_local _DISTFADEMODE_ENABLED
             #pragma shader_feature_local _ _PROGRESSIVE_REFINEMENT_ON _PROGRESSIVE_COLOR_ON
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -168,7 +168,7 @@ Shader "RayMarchScene" {
                 SdfMaterial mat = GetMaterialAtScene(p);
                 color = SdfLighting(p, normalWS, clipSpacePos, mat, half4(_Tint));
 
-#if defined(_MINDISTFADEMODE_ENABLED)
+#if defined(_DISTFADEMODE_ENABLED)
                 color.a *= smoothstep(_DistFadeMax, _DistFadeMin, minDist);
 #endif
                 color = saturate(color);

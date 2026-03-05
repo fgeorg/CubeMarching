@@ -45,7 +45,7 @@ public class RayMarchMaterialEditor : ShaderGUI {
             "Fades out pixels that failed to converge within the max ray march steps. " +
             "The fade range is based on the final distance reached."),
             EditorStyles.boldLabel);
-        bool distFadeOn = (editor.target as Material).IsKeywordEnabled("_MINDISTFADEMODE_ENABLED");
+        bool distFadeOn = (editor.target as Material).IsKeywordEnabled("_DISTFADEMODE_ENABLED");
         EditorGUI.BeginChangeCheck();
         distFadeOn = EditorGUILayout.Toggle("Enabled", distFadeOn);
         if (distFadeOn)
@@ -60,11 +60,11 @@ public class RayMarchMaterialEditor : ShaderGUI {
                 Material m = t as Material;
                 if (distFadeOn)
                 {
-                    m.EnableKeyword("_MINDISTFADEMODE_ENABLED");
+                    m.EnableKeyword("_DISTFADEMODE_ENABLED");
                 }
                 else
                 {
-                    m.DisableKeyword("_MINDISTFADEMODE_ENABLED");
+                    m.DisableKeyword("_DISTFADEMODE_ENABLED");
                 }
             }
         }
