@@ -2,7 +2,7 @@ using UnityEditor;
 using UnityEngine;
 
 public class RayMarchMaterialEditor : ShaderGUI {
-    enum BackfaceCullMode { Off = 0, Alpha = 1, Discard = 2 }
+    enum BackfaceCullMode { Off = 0, Alpha = 1 }
     enum MinDistFadeMode  { Off = 0, Enabled = 1 }
     enum VoxelMode        { Off = 0, AccelOnly = 1, Full = 2 }
 
@@ -52,11 +52,7 @@ public class RayMarchMaterialEditor : ShaderGUI {
             Draw("_BackfaceCullMin");
             Draw("_BackfaceCullMax");
         }
-        else if (backfaceCullMode == BackfaceCullMode.Discard)
-        {
-            Draw("_BackfaceCullThreshold");
-        }
-        EditorGUILayout.Space();
+EditorGUILayout.Space();
 
         // --- Dist Fade ---
         EditorGUILayout.LabelField(new GUIContent("Dist Fade  ⓘ",
@@ -109,6 +105,29 @@ public class RayMarchMaterialEditor : ShaderGUI {
             }
         }
         EditorGUILayout.Space();
+
+        // --- Progressive Color ---
+        EditorGUILayout.LabelField("Progressive Color", EditorStyles.boldLabel);
+        bool colorOn = (editor.target as Material).IsKeywordEnabled("_PROGRESSIVE_COLOR_ON");
+        EditorGUI.BeginChangeCheck();
+        colorOn = EditorGUILayout.Toggle("Enabled", colorOn);
+        if (EditorGUI.EndChangeCheck())
+        {
+            foreach (Object t in editor.targets)
+            {
+                Material m = t as Material;
+                if (colorOn)
+                {
+                    m.EnableKeyword("_PROGRESSIVE_COLOR_ON");
+                }
+                else
+                {
+                    m.DisableKeyword("_PROGRESSIVE_COLOR_ON");
+                }
+            }
+        }
+        EditorGUILayout.Space();
+
         editor.RenderQueueField();
     }
 }

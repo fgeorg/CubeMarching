@@ -14,6 +14,7 @@ Material:
   m_ValidKeywords:
   - _BACKFACECULLMODE_ALPHA
   - _MINDISTFADEMODE_ENABLED
+  - _PROGRESSIVE_COLOR_ON
   - _PROGRESSIVE_REFINEMENT_ON
   - _TEMPORALDEBUG_OFF
   - _VOXELFILTER_MINECRAFT
@@ -108,8 +109,8 @@ Material:
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
-    - _DistFadeMax: 0.02
-    - _DistFadeMin: 0.001
+    - _DistFadeMax: 0.01
+    - _DistFadeMin: 0
     - _DstBlend: 0
     - _EnvironmentReflections: 1
     - _GlossMapScale: 0
@@ -117,7 +118,7 @@ Material:
     - _GlossyReflections: 0
     - _MarchMode: 0
     - _MaxDist: 100
-    - _MaxSteps: 11
+    - _MaxSteps: 50
     - _Metallic: 0
     - _MinDistFadeMax: 0.02
     - _MinDistFadeMin: 0.001

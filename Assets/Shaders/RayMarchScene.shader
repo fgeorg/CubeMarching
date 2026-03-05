@@ -6,10 +6,9 @@ Shader "RayMarchScene" {
         _MaxDist ("Max Dist", Range(1, 1000)) = 100
         _NormalDist ("Normal Dist", Range(0.00001, 0.1)) = 0.01
         _StepFactor ("Step Factor", Range(0.5, 1.0)) = 1.0
-        [KeywordEnum(Disabled, Alpha, Discard)] _BackfaceCullMode ("Backface Cull Mode", Float) = 1
+        [KeywordEnum(Disabled, Alpha)] _BackfaceCullMode ("Backface Cull Mode", Float) = 1
         _BackfaceCullMin ("Backface Cull Min", Range(0, 1.0)) = 0.1
         _BackfaceCullMax ("Backface Cull Max", Range(0, 1.0)) = 0.5
-        _BackfaceCullThreshold ("Backface Cull Threshold", Range(0.0, 1.0)) = 0.0
         [KeywordEnum(Disabled, Enabled)] _MinDistFadeMode ("Min Dist Fade Mode", Float) = 1
         _DistFadeMin ("Dist Fade Min", Range(0, 0.2)) = 0.001
         _DistFadeMax ("Dist Fade Max", Range(0, 0.2)) = 0.02
@@ -43,11 +42,12 @@ Shader "RayMarchScene" {
             #pragma shader_feature_local _ _MIXED_LIGHTING_SUBTRACTIVE
             #pragma shader_feature _ PROBE_VOLUMES_L1 PROBE_VOLUMES_L2
             #pragma multi_compile_instancing
-            #pragma shader_feature_local _BACKFACECULLMODE_DISABLED _BACKFACECULLMODE_ALPHA _BACKFACECULLMODE_DISCARD
+            #pragma shader_feature_local _BACKFACECULLMODE_DISABLED _BACKFACECULLMODE_ALPHA
             #pragma shader_feature_local _MINDISTFADEMODE_DISABLED _MINDISTFADEMODE_ENABLED
             #pragma shader_feature_local _VOXELMODE_OFF _VOXELMODE_ACCEL _VOXELMODE_DEBUG
             #pragma shader_feature_local _VOXELFILTER_POINT _VOXELFILTER_TRILINEAR _VOXELFILTER_SNAP _VOXELFILTER_MINECRAFT
             #pragma shader_feature_local _PROGRESSIVE_REFINEMENT_ON
+            #pragma shader_feature _PROGRESSIVE_COLOR_ON
             #pragma shader_feature_local _TEMPORALDEBUG_OFF _TEMPORALDEBUG_NDC
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -78,6 +78,9 @@ Shader "RayMarchScene" {
             // UAV for ray march distance capture — written via SetRandomWriteTarget(1, currHandle).
             // Avoids MRT slot routing issues on Metal by bypassing framebuffer attachment.
             RWTexture2D<float> _CurrSdfDistTex : register(u1);
+            // Progressive color accumulation globals.
+            TEXTURE2D(_PrevSdfColorTex);
+            RWTexture2D<float4> _CurrSdfColorTex : register(u2);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
@@ -87,7 +90,6 @@ Shader "RayMarchScene" {
                 float _StepFactor;
                 float _BackfaceCullMin;
                 float _BackfaceCullMax;
-                float _BackfaceCullThreshold;
                 float _DistFadeMin;
                 float _DistFadeMax;
                 int _MaxSteps;
@@ -303,8 +305,22 @@ Shader "RayMarchScene" {
                 float3 ro = i.ro;
                 float3 rd = normalize(i.hitPos - ro);
                 float minDist = _MaxDist;
+                
 #if defined(_PROGRESSIVE_REFINEMENT_ON)
                 float dO = SAMPLE_TEXTURE2D(_PrevSdfDistTex, sampler_point_clamp, screenUV).r;
+#if defined(_PROGRESSIVE_COLOR_ON)
+                float3 oldP = ro + dO * rd;
+
+                if (abs(GetDistanceToScene(oldP) < dO * 1e-6)) {
+                    // "cache hit"
+                    float4 oldClipSpacePos = TransformWorldToHClip(oldP);
+                    _CurrSdfDistTex[uint2(i.vertex.xy)] = dO;
+                    color = _CurrSdfColorTex[uint2(i.vertex.xy)] = _PrevSdfColorTex[uint2(i.vertex.xy)];
+                    depth = oldClipSpacePos.z / oldClipSpacePos.w;
+                    return;
+                }
+                _CurrSdfColorTex[uint2(i.vertex.xy)] = float4(0, 0, 0, 0);
+#endif
 #else
                 float dO = 0;
 #endif
@@ -320,6 +336,7 @@ Shader "RayMarchScene" {
                 if (d > _MaxDist) {
                     col.a = 0;
                     _CurrSdfDistTex[uint2(i.vertex.xy)] = d;
+                    _CurrSdfColorTex[uint2(i.vertex.xy)] = float4(0, 0, 0, 0);
                     return;
                 }
 
@@ -344,13 +361,7 @@ Shader "RayMarchScene" {
                 col = SdfLighting(p, normalWS, clipSpacePos, mat, half4(_Tint));
 
                 float ndotv = dot(normalWS, rd);
-#if defined(_BACKFACECULLMODE_DISCARD)
-                if (ndotv > _BackfaceCullThreshold) {
-                    col.a = 0;
-                    _CurrSdfDistTex[uint2(i.vertex.xy)] = d;
-                    return;
-                };
-#elif defined(_BACKFACECULLMODE_ALPHA)
+#if defined(_BACKFACECULLMODE_ALPHA)
                 col.a *= 1 - smoothstep(_BackfaceCullMin, _BackfaceCullMax, ndotv);
 #endif
 #if defined(_MINDISTFADEMODE_ENABLED)
@@ -358,8 +369,14 @@ Shader "RayMarchScene" {
 #endif
 
                 color = saturate(col);
+#if defined(_PROGRESSIVE_COLOR_ON)
+                float4 prevColor = SAMPLE_TEXTURE2D(_PrevSdfColorTex, sampler_point_clamp, screenUV);
+                color.rgb = color.a * color.rgb + prevColor.rgb * (1.0 - color.a);
+                color.a = max(color.a, prevColor.a);
+#endif
                 depth = clipSpacePos.z / clipSpacePos.w;
                 _CurrSdfDistTex[uint2(i.vertex.xy)] = d;
+                _CurrSdfColorTex[uint2(i.vertex.xy)] = color;
             }
             ENDHLSL
         }
