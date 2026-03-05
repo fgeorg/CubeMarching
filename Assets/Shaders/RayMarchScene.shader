@@ -18,7 +18,7 @@ Shader "RayMarchScene" {
 
         Pass {
             Name "UniversalForward"
-            Tags { "LightMode"="SdfMrt" }
+            Tags { "LightMode"="SdfProgressive" }
 
             HLSLPROGRAM
             #pragma vertex vert

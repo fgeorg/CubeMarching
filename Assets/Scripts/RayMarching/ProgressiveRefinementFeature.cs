@@ -12,7 +12,7 @@ using UnityEngine.Rendering.Universal;
 // Setup:
 //   1. Add this feature to your URP ForwardRenderer asset.
 //   2. Enable _PROGRESSIVE_REFINEMENT_ON on the SDF material.
-//   3. The SDF shader must use LightMode = "SdfMrt".
+//   3. The SDF shader must use LightMode = "SdfProgressive".
 [ExecuteInEditMode]
 public class ProgressiveRefinementFeature : ScriptableRendererFeature {
     const int BufferCount = 2;
@@ -28,7 +28,7 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature {
         public bool initialized;
         // Per-camera instances — a shared instance's Setup() gets overwritten because
         // AddRenderPasses runs for all cameras before RecordRenderGraph runs for any.
-        public SdfMrtPass sdfMrtPass;
+        public SdfProgressivePass sdfMrtPass;
     }
 
     public static event System.Action ColorBuffersInvalidated;
@@ -66,7 +66,7 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature {
         int camId = cam.GetInstanceID();
 
         if (!m_CameraStates.TryGetValue(camId, out CameraState state)) {
-            SdfMrtPass sdfMrtPass = new SdfMrtPass();
+            SdfProgressivePass sdfMrtPass = new SdfProgressivePass();
             sdfMrtPass.renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
             state = new CameraState { sdfMrtPass = sdfMrtPass };
             m_CameraStates[camId] = state;
@@ -138,8 +138,8 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature {
 
     // Binds _PrevSdfDistTex (last frame's distances), draws SDF, UAV-writes
     // this frame's distances into currHandle. Reprojection uses UNITY_MATRIX_I_VP.
-    class SdfMrtPass : ScriptableRenderPass {
-        static readonly ShaderTagId s_SdfMrtTag = new("SdfMrt");
+    class SdfProgressivePass : ScriptableRenderPass {
+        static readonly ShaderTagId s_SdfProgressiveTag = new("SdfProgressive");
         static readonly int s_PrevSdfDistTexId = Shader.PropertyToID("_PrevSdfDistTex");
         static readonly int s_PrevSdfColorTexId = Shader.PropertyToID("_PrevSdfColorTex");
         static readonly int s_SdfPrevViewProjMatrixId = Shader.PropertyToID("_SdfPrevViewProjMatrix");
@@ -187,7 +187,7 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature {
             SortingSettings sortSettings = new SortingSettings(cameraData.camera) {
                 criteria = SortingCriteria.CommonTransparent
             };
-            DrawingSettings drawSettings = new DrawingSettings(s_SdfMrtTag, sortSettings) {
+            DrawingSettings drawSettings = new DrawingSettings(s_SdfProgressiveTag, sortSettings) {
                 enableDynamicBatching = renderingData.supportsDynamicBatching,
                 enableInstancing = true,
                 perObjectData = PerObjectData.ReflectionProbes | PerObjectData.OcclusionProbe
@@ -210,7 +210,7 @@ public class ProgressiveRefinementFeature : ScriptableRendererFeature {
                 ? renderGraph.defaultResources.blackTexture
                 : renderGraph.ImportTexture(m_PrevColorHandle);
 
-            using (var builder = renderGraph.AddUnsafePass<PassData>("SdfMrtPass", out PassData passData)) {
+            using (var builder = renderGraph.AddUnsafePass<PassData>("SdfProgressivePass", out PassData passData)) {
                 passData.rendererList = sdfList;
                 passData.colorTarget = resourceData.activeColorTexture;
                 passData.depthTarget = resourceData.cameraDepth;

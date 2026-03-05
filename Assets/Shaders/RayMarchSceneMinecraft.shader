@@ -17,7 +17,7 @@ Shader "RayMarchSceneMinecraft" {
 
         Pass {
             Name "UniversalForward"
-            Tags { "LightMode"="SdfMrt" }
+            Tags { "LightMode"="UniversalForward" }
 
             HLSLPROGRAM
             #pragma vertex vert
@@ -50,10 +50,6 @@ Shader "RayMarchSceneMinecraft" {
             SAMPLER(sampler_MainTex);
             TEXTURE3D(_VoxelTex);
             SAMPLER(sampler_point_clamp);
-
-            // UAV outputs — written by ProgressiveRefinementFeature infrastructure.
-            RWTexture2D<float> _CurrSdfDistTex : register(u1);
-            RWTexture2D<float4> _CurrSdfColorTex : register(u2);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
@@ -196,8 +192,6 @@ Shader "RayMarchSceneMinecraft" {
 
                 if (d > _MaxDist) {
                     color.a = 0;
-                    _CurrSdfDistTex[uint2(i.vertex.xy)] = d;
-                    _CurrSdfColorTex[uint2(i.vertex.xy)] = float4(0, 0, 0, 0);
                     return;
                 }
 
@@ -210,8 +204,6 @@ Shader "RayMarchSceneMinecraft" {
                 color = saturate(color);
 
                 depth = clipSpacePos.z / clipSpacePos.w;
-                _CurrSdfDistTex[uint2(i.vertex.xy)] = d;
-                _CurrSdfColorTex[uint2(i.vertex.xy)] = color;
             }
             ENDHLSL
         }
